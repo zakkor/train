@@ -1,0 +1,8 @@
+[package]
+name = "train"
+version = "0.1.0"
+authors = ["zakkor@github.com <edward.partenie@gmail.com>"]
+
+[dependencies]
+sfml = "*"
+rand = "*"
