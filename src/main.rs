@@ -24,150 +24,14 @@ use player::*;
 mod menu;
 use menu::*;
 
-#[derive(Clone)]
-struct Tile<'a> {
-    sprite: Sprite<'a>,
-    is_solid: bool,
-    bounds: IntRect
-}
-
-impl<'a> Tile<'a> {
-    fn new_with_texture(texture: &'a Texture) -> Self {
-        Tile {
-            sprite: Sprite::new_with_texture(texture).unwrap(),
-            is_solid: false,
-            bounds: IntRect::new(0, 0, 0, 0)
-        }
-    }
-
-    fn new() -> Self {
-        Tile {
-            sprite: Sprite::new().unwrap(),
-            is_solid: false,
-            bounds: IntRect::new(0, 0, 0, 0)
-        }
-    }
-}
-
-struct Wagon<'a> {
-    tiles: Vec<Vec<Tile<'a>>>,
-    connected_to: [Option<&'a mut Wagon<'a>>; 2]
-}
+mod wagon;
+use wagon::*;
 
 const TILE_SIZE_X: u32 = 64;
 const TILE_SIZE_Y: u32 = 64;
 
 const WINDOW_SIZE_X: u32 = 1600;
 const WINDOW_SIZE_Y: u32 = 900;
-
-impl<'a> Wagon<'a> {
-    /// Creates a new wagon of size `size_x, size_y` and places all its tiles with the corner at (0,0).
-    fn new(tex_man: &'a TextureManager, size_x: u32, size_y: u32) -> Self {
-        if size_y % 2 == 0 {
-            panic!("wagon height needs to be an odd number");
-        }
-        
-        let mut tiles: Vec<Vec<Tile>> = vec![];
-        for i in 0..(size_y + 2) {
-            tiles.push(vec![]);
-            for j in 0..(size_x + 2) {
-                let mut tile = Tile::new();
-                tile.sprite.set_position2f((j * TILE_SIZE_X) as f32, (i * TILE_SIZE_Y) as f32);
-                tile.is_solid = true;
-
-                if (i, j) == (0, 0) {
-                    tile.sprite.set_texture(tex_man.get(TextureId::CornerTopLeft), true);
-                }
-                else if (i, j) == (size_y + 1, 0) {
-                    tile.sprite.set_texture(tex_man.get(TextureId::CornerBottomLeft), true);
-                }
-                else if (i, j) == (0, size_x + 1) {
-                    tile.sprite.set_texture(tex_man.get(TextureId::CornerTopRight), true);
-                }
-                else if (i, j) == (size_y + 1, size_x + 1) {
-                    tile.sprite.set_texture(tex_man.get(TextureId::CornerBottomRight), true);
-                }
-                else if j == 0 {
-                    tile.sprite.set_texture(tex_man.get(TextureId::WallLeft), true);
-                }
-                else if j == size_x + 1 {
-                    tile.sprite.set_texture(tex_man.get(TextureId::WallRight), true);
-                }
-                else if i == 0 {
-                    tile.sprite.set_texture(tex_man.get(TextureId::WallTop), true);
-                    tile.bounds = IntRect::new(0, 58, 64, 6);
-                }
-                else if i == size_y + 1 {
-                    tile.sprite.set_texture(tex_man.get(TextureId::WallBottom), true);
-                }
-                else {
-                    tile.sprite.set_texture(tex_man.get(TextureId::Floor), true);
-                    tile.is_solid = false;
-                }
-                tiles[i as usize].push(tile);
-            }
-        }
-        
-        Wagon {
-            tiles: tiles,
-            connected_to: [None, None]
-        }
-    }
-
-    fn set_position2f(&mut self, dest_x: f32, dest_y: f32) {
-        for i in 0..(self.tiles.len()) {
-            for j in 0..(self.tiles[i].len()) {
-                let current_x = self.tiles[i][j].sprite.get_position().x;
-                let current_y = self.tiles[i][j].sprite.get_position().y;
-                self.tiles[i][j].sprite.set_position2f(current_x + dest_x, current_y + dest_y);
-            }
-        }
-
-        if let Some(ref mut x) = self.connected_to[0] {
-            x.set_position2f(dest_x, dest_y);
-        }
-    }
-
-    /// Connects wagon `other` to the *left* side of wagon `self`.
-    fn connect(& mut self, other: &mut Wagon<'a>, tex_man: &'a TextureManager) {
-        let self_height = self.tiles.len();
-        let self_height_half = self_height / 2;
-        let other_height = other.tiles.len();
-        let other_width = other.tiles[0].len();
-        let other_height_half = other_height / 2;
-        
-        self.tiles[self_height_half - 1][0].sprite.set_texture(tex_man.get(TextureId::ConnectorTop), true);
-        self.tiles[self_height_half][0].sprite.set_texture(tex_man.get(TextureId::Floor), true);
-        self.tiles[self_height_half + 1][0].sprite.set_texture(tex_man.get(TextureId::ConnectorBottom), true);
-        
-
-        other.tiles[other_height_half - 1][other_width -1].sprite.set_texture(tex_man.get(TextureId::WallConnectedTop), true);
-        other.tiles[other_height_half][other_width -1] = Tile::new();
-        other.tiles[other_height_half + 1][other_width -1].sprite.set_texture(tex_man.get(TextureId::WallConnectedBottom), true);
-        other.set_position2f((self.tiles[0][0].sprite.get_position().x - ((other_width - 1) * TILE_SIZE_X as usize) as f32) as f32, self.tiles[0][0].sprite.get_position().y + ((self_height_half - other_height_half) * TILE_SIZE_Y as usize) as f32);
-    }
-}
-
-impl<'a> Drawable for Wagon<'a> {
-    fn draw<RT: RenderTarget>(&self, render_target: &mut RT, render_states: &mut RenderStates) {
-        for i in 0..(self.tiles.len()) {
-            for j in 0..(self.tiles[i].len()) {
-                render_target.draw(&self.tiles[i][j].sprite);
-                if self.tiles[i][j].is_solid {
-                    let mut shape = RectangleShape::new().unwrap();
-                    shape.set_fill_color(&Color::new_rgba(255, 0, 0, 100));
-                    let bounds = self.tiles[i][j].bounds;
-                    shape.set_size2f(bounds.width as f32, bounds.height as f32);
-                    shape.set_position2f(self.tiles[i][j].sprite.get_position().x + bounds.left as f32,
-                                         self.tiles[i][j].sprite.get_position().y + bounds.top as f32);
-                    
-                    render_target.draw(&shape);
-                }
-            } 
-        }
-    }
-}
-
 
 fn main() {
     // Create the window of the application
@@ -213,8 +77,6 @@ fn main() {
     tex_man.load(TextureId::WallConnectedBottom, "res/wall_connected_bottom.png");
     tex_man.load(TextureId::Background, "res/bg.png");
 
-    let mut player = Player::new();
-
 
     let mut state_stack = StateStack::new();
     state_stack.push(StateType::Playing);
@@ -232,10 +94,24 @@ fn main() {
     // delta time
     let mut clock = Clock::new();
 
-    let mut wagon1 = Wagon::new(&tex_man, 5, 5);
-    let mut wagon2 = Wagon::new(&tex_man, 5, 5);
-    wagon1.set_position2f(750., 225.);    
-    wagon1.connect(&mut wagon2, &tex_man);
+    let mut wagons = vec![Wagon::new(&tex_man, 5, 7),
+                          Wagon::new(&tex_man, 5, 5),
+                          Wagon::new(&tex_man, 3, 3),
+                         ];
+    
+
+    wagons[0].set_position2f(788., 225.);
+    {
+        let (a, b) = wagons.split_at_mut(1);
+        a[0].connect(&mut b[0], &tex_man);
+    }
+    {
+        let (a, b) = wagons.split_at_mut(2);
+        a[1].connect(&mut b[0], &tex_man);
+    }
+
+    wagons[1].tiles[0][3] = Tile::new();
+
 
     let mut bg1 = Sprite::new_with_texture(&tex_man.get(TextureId::Background)).unwrap();
     let mut bg2 = bg1.clone();
@@ -257,9 +133,15 @@ fn main() {
     // TODO: move to Train
     let mut current_speed = 0.;
     let top_speed = 1000.;
-    let accel = 0.5;
+    let accel = 5.;
 
     let mut moving = false;
+
+
+
+    let mut actors = vec![Player::new(), Player::new()];
+
+    let selected_actor = 0;
 
     while window.is_open() {
         // ___________________ EVENTS_BEGIN ______________//
@@ -306,6 +188,9 @@ fn main() {
                                 }
                                 if let Key::Space = code {
                                     moving = !moving;
+                                }
+                                if let Key::P = code {
+                                    
                                 }
                             }
                             _ => {
@@ -394,50 +279,80 @@ fn main() {
         match *state_stack.top().unwrap() {
             StateType::Playing => {
                 {
-                    // ___________________ UPDATE_BEGIN ______________//
+                    // // ___________________ UPDATE_BEGIN ______________//
                     let dt = time.as_seconds();
-                    let (dx, dy) = {
-                        let mult = 150. * dt;
-                        if Key::W.is_pressed() {
-                            (0., -mult)
-                        } else if Key::A.is_pressed() {
-                            (-mult, 0.)
-                        } else if Key::S.is_pressed() {
-                            (0., mult)
-                        } else if Key::D.is_pressed() {
-                            (mult, 0.)
-                        } else {
-                            (0., 0.)
-                        }
-                    };
+                    // let (dx, dy) = {
+                    //     let mult = 150. * dt;
+                    //     if Key::W.is_pressed() {
+                    //         (0., -mult)
+                    //     } else if Key::A.is_pressed() {
+                    //         (-mult, 0.)
+                    //     } else if Key::S.is_pressed() {
+                    //         (0., mult)
+                    //     } else if Key::D.is_pressed() {
+                    //         (mult, 0.)
+                    //     } else {
+                    //         (0., 0.)
+                    //     }
+                    // };
 
-                    if (dx, dy) != (0., 0.) {
-                        let player_bounds = player.shape.get_global_bounds();
+                    // if (dx, dy) != (0., 0.) {
+                        // let actor_bounds = a.shape.get_global_bounds();
                         
-                        let desired_pos = FloatRect::new(player_bounds.left + dx,
-                                                         player_bounds.top + dy,
-                                                         player_bounds.width,
-                                                         player_bounds.height);
-                        let mut ok_to_move = true;                    
-                        for t in wagon2.tiles.iter() {
-                            for t in t.iter() {
-                                if !t.is_solid {
-                                    continue;
-                                }
-                                if let Some(_) = desired_pos.intersects(
-                                    &FloatRect::new(t.bounds.left as f32 + t.sprite.get_position().x,
-                                                    t.bounds.top as f32 + t.sprite.get_position().y,
-                                                    t.bounds.width as f32,
-                                                    t.bounds.height as f32)) {
-                                    ok_to_move = false;
-                                    break;
+                        // let desired_pos = FloatRect::new(actor_bounds.left + dx,
+                        //                                  actor_bounds.top + dy,
+                        //                                  actor_bounds.width,
+                        //                                  actor_bounds.height);
+                        // let mut ok_to_move = true;
+                        // for w in wagons.iter() {
+                        //     for t in w.tiles.iter() {
+                        //         for t in t.iter() {
+                        //             if !t.is_solid {
+                        //                 continue;
+                        //             }
+                        //             for b in t.bounds.iter() {
+                        //                 let b = if *b != None {
+                        //                     b.unwrap()
+                        //                 }
+                        //                 else {
+                        //                     continue;
+                        //                 };
+                        //                 if let Some(_) = desired_pos.intersects(
+                        //                     &FloatRect::new(b.left as f32 + t.sprite.get_position().x,
+                        //                                     b.top as f32 + t.sprite.get_position().y,
+                        //                                     b.width as f32,
+                        //                                     b.height as f32)) {
+                        //                     ok_to_move = false;
+                        //                     break;
+                        //                 }
+                        //             }
+                        //         }
+                        //     }
+
+                        // }
+                    //                        if ok_to_move {
+                    for (i, a) in actors.iter_mut().enumerate() {
+                        //                            a.shape.move2f(dx, dy);
+                        if moving {
+                            if i == 0 {
+                                a.shape.move2f(0., -25. * dt);
+                            }
+                            if i == 1 {
+                                a.shape.move2f(50. * dt, -1. * dt);
+                            }
+                        }
+                        a.inside_wagon = false;
+                        for w in wagons.iter() {
+                            for t in w.tiles.iter() {
+                                for t in t.iter() {
+                                    if !t.is_solid && t.sprite.get_global_bounds().contains(a.shape.get_position()) { 
+                                        a.inside_wagon = true;
+                                        break;
+                                    }
                                 }
                             }
                         }
                         
-                        if ok_to_move {
-                            player.shape.move2f(dx, dy);
-                        }
 
                     }
 
@@ -460,26 +375,39 @@ fn main() {
 
                     bg1.move2f(dt * -current_speed, 0.);
                     bg2.move2f(dt * -current_speed, 0.);
-                    
 
+                    for a in actors.iter_mut() {
+                        if !a.inside_wagon {
+                            a.shape.move2f(dt * -current_speed, 0.);
+                        }
+                    }
                     // ___________________ UPDATE_END ________________//
                 }
 
                 {
                     // ___________________ RENDER_BEGIN  _____________//
-                    // Set view
-//                    window.set_view(&view);
                     // Clear the window
                     window.clear(&Color::black());
 
                     window.draw(&bg1);
                     window.draw(&bg2);
-                    
-                    window.draw(&wagon1);
-                    window.draw(&wagon2);
 
-                    window.draw(&player.shape);
-//                    window.draw(&tile.sprite);
+                    for a in actors.iter() {
+                        if !a.inside_wagon {
+                            window.draw(&a.shape);
+                        }
+                    }
+                    
+                    for w in wagons.iter() {
+                        window.draw(w);
+                    }
+
+                    for a in actors.iter() {
+                        if a.inside_wagon {
+                            window.draw(&a.shape);
+                        }
+                    }
+                    
 
                     // ____________________ RENDER_END _____________//
                 }
