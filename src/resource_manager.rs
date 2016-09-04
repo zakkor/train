@@ -44,14 +44,27 @@ impl<I: Eq + Hash, R: Resource> ResourceManager<I, R> {
 }
 
 #[derive(PartialEq, Eq, Hash)]
-pub enum TextureIdentifiers {
-
+pub enum TextureId {
+    Floor,
+    WallTop,
+    WallBottom,
+    WallLeft,
+    WallRight,
+    CornerTopLeft,
+    CornerTopRight,
+    CornerBottomLeft,
+    CornerBottomRight,
+    ConnectorTop,
+    ConnectorBottom,
+    WallConnectedTop,
+    WallConnectedBottom,
+    Background,
 }
 #[derive(PartialEq, Eq, Hash)]
-pub enum FontIdentifiers {
+pub enum FontId {
     Arial,
     Joystix
 }
 
-pub type TextureManager = ResourceManager<TextureIdentifiers, Texture>;
-pub type FontManager = ResourceManager<FontIdentifiers, Font>;
+pub type TextureManager = ResourceManager<TextureId, Texture>;
+pub type FontManager = ResourceManager<FontId, Font>;
