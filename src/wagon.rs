@@ -143,27 +143,28 @@ impl<'a> Drawable for Wagon<'a> {
         for i in 0..(self.tiles.len()) {
             for j in 0..(self.tiles[i].len()) {
                 render_target.draw(&self.tiles[i][j].sprite);
-                // if self.tiles[i][j].is_solid {
+                if self.tiles[i][j].is_solid {
 
-                //     let bounds = self.tiles[i][j].bounds;
-                //     for b in bounds.iter() {
-                //         let b = if *b != None {
-                //             b.unwrap()
-                //         }
-                //         else {
-                //             continue;
-                //         };
-                //         let mut shape = RectangleShape::new().unwrap();
-                //         shape.set_fill_color(&Color::new_rgba(255, 0, 0, 100));
-                //         shape.set_size2f(b.width as f32, b.height as f32);
-                //         shape.set_position2f(self.tiles[i][j].sprite.get_position().x + b.left as f32,
-                //                              self.tiles[i][j].sprite.get_position().y + b.top as f32);
+                    let bounds = self.tiles[i][j].bounds;
+                    for b in bounds.iter() {
+                        let b = if *b != None {
+                            b.unwrap()
+                        }
+                        else {
+                            continue;
+                        };
+                        let mut shape = RectangleShape::new().unwrap();
+                        shape.set_fill_color(&Color::new_rgba(255, 0, 0, 100));
+                        shape.set_size2f(b.width as f32, b.height as f32);
+                        shape.set_position2f(self.tiles[i][j].sprite.get_position().x + b.left as f32,
+                                             self.tiles[i][j].sprite.get_position().y + b.top as f32);
                         
-                //         render_target.draw(&shape);
-                //     }
+                        render_target.draw(&shape);
+                    }
                     
-//                }
+               }
             } 
         }
     }
 }
+ 

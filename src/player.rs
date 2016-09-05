@@ -11,7 +11,8 @@ use wagon::*;
 pub struct Player<'a> {
     pub shape: RectangleShape<'a>,
     pub inside_wagon: bool,
-//    pub id: ActorId,
+    //    pub id: ActorId,
+    pub move_dir: Vector2f,
 }
 
 impl<'a> Player<'a> {
@@ -27,7 +28,8 @@ impl<'a> Player<'a> {
         Player {
             shape: shape,
             inside_wagon: true,
-//            id: NUMBER_OF_ACTORS
+            //            id: NUMBER_OF_ACTORS,
+            move_dir: Vector2f::new(0., 0.)
         }
     }
 }

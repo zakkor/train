@@ -97,7 +97,7 @@ fn main() {
     let mut wagons = vec![Wagon::new(&tex_man, 5, 7),
                           Wagon::new(&tex_man, 5, 5),
                           Wagon::new(&tex_man, 3, 3),
-                         ];
+    ];
     
 
     wagons[0].set_position2f(788., 225.);
@@ -141,7 +141,7 @@ fn main() {
 
     let mut actors = vec![Player::new(), Player::new()];
 
-    let selected_actor = 0;
+    let mut selected_actor = 0;
 
     while window.is_open() {
         // ___________________ EVENTS_BEGIN ______________//
@@ -166,8 +166,30 @@ fn main() {
                             event::MouseMoved { x, .. } => {}
                             event::MouseButtonPressed { button, .. } => {
                                 match button {
-                                    MouseButton::Left => {}
-                                    MouseButton::Right => {}
+                                    MouseButton::Left => {
+                                        // select actor under cursor
+                                        let mut actor_to_unselect: Option<usize> = None;
+                                        for (i, a) in actors.iter_mut().enumerate() {
+                                            if a.shape.get_global_bounds().contains(window.get_mouse_position().to_vector2f()) {
+                                                actor_to_unselect = Some(selected_actor);
+                                                a.shape.set_fill_color(&Color::green());
+                                                selected_actor = i;
+                                                break;
+                                            }
+                                        }
+                                        if let Some(a) = actor_to_unselect {
+                                            actors[a].shape.set_fill_color(&Color::red());
+                                        }
+                                    }
+                                    MouseButton::Right => {
+                                        let move_to = window.get_mouse_position().to_vector2f();
+                                        let current_pos = actors[selected_actor].shape.get_position();
+                                        let mut move_dir = Vector2f::new(move_to.x - current_pos.x, move_to.y - current_pos.y);
+                                        let vec_len = (move_dir.x.powi(2) + move_dir.y.powi(2)).sqrt().abs();
+                                        move_dir.x = move_dir.x / vec_len;
+                                        move_dir.y = move_dir.y / vec_len;
+                                        actors[selected_actor].move_dir = move_dir;
+                                    }
                                     
                                     _ => {}
                                 }
@@ -214,18 +236,18 @@ fn main() {
                                     let x = x as f32;
                                     let y = y as f32;
                                     if x > button.text.get_position().x &&
-                                       x <
-                                       (button.text.get_position().x +
-                                        button.text.get_local_bounds().width) &&
-                                       y > button.text.get_position().y &&
-                                       y <
-                                       (button.text.get_position().y +
-                                        button.text.get_local_bounds().height * 2.) {
-                                        // <- *2. because Text bounding box is broken - SFML bug?
-                                        button.text.set_color(&Color::green());
-                                    } else {
-                                        button.text.set_color(&Color::white());
-                                    }
+                                        x <
+                                        (button.text.get_position().x +
+                                         button.text.get_local_bounds().width) &&
+                                        y > button.text.get_position().y &&
+                                        y <
+                                        (button.text.get_position().y +
+                                         button.text.get_local_bounds().height * 2.) {
+                                            // <- *2. because Text bounding box is broken - SFML bug?
+                                            button.text.set_color(&Color::green());
+                                        } else {
+                                            button.text.set_color(&Color::white());
+                                        }
                                 }
                             }
                             event::MouseButtonReleased { button, .. } => {
@@ -281,78 +303,63 @@ fn main() {
                 {
                     // // ___________________ UPDATE_BEGIN ______________//
                     let dt = time.as_seconds();
-                    // let (dx, dy) = {
-                    //     let mult = 150. * dt;
-                    //     if Key::W.is_pressed() {
-                    //         (0., -mult)
-                    //     } else if Key::A.is_pressed() {
-                    //         (-mult, 0.)
-                    //     } else if Key::S.is_pressed() {
-                    //         (0., mult)
-                    //     } else if Key::D.is_pressed() {
-                    //         (mult, 0.)
-                    //     } else {
-                    //         (0., 0.)
-                    //     }
-                    // };
-
-                    // if (dx, dy) != (0., 0.) {
-                        // let actor_bounds = a.shape.get_global_bounds();
-                        
-                        // let desired_pos = FloatRect::new(actor_bounds.left + dx,
-                        //                                  actor_bounds.top + dy,
-                        //                                  actor_bounds.width,
-                        //                                  actor_bounds.height);
-                        // let mut ok_to_move = true;
-                        // for w in wagons.iter() {
-                        //     for t in w.tiles.iter() {
-                        //         for t in t.iter() {
-                        //             if !t.is_solid {
-                        //                 continue;
-                        //             }
-                        //             for b in t.bounds.iter() {
-                        //                 let b = if *b != None {
-                        //                     b.unwrap()
-                        //                 }
-                        //                 else {
-                        //                     continue;
-                        //                 };
-                        //                 if let Some(_) = desired_pos.intersects(
-                        //                     &FloatRect::new(b.left as f32 + t.sprite.get_position().x,
-                        //                                     b.top as f32 + t.sprite.get_position().y,
-                        //                                     b.width as f32,
-                        //                                     b.height as f32)) {
-                        //                     ok_to_move = false;
-                        //                     break;
-                        //                 }
-                        //             }
-                        //         }
-                        //     }
-
-                        // }
-                    //                        if ok_to_move {
                     for (i, a) in actors.iter_mut().enumerate() {
-                        //                            a.shape.move2f(dx, dy);
-                        if moving {
-                            if i == 0 {
-                                a.shape.move2f(0., -25. * dt);
+                        //                                                   a.shape.move2f(dx, dy);
+
+                        let (dx, dy) = {
+                            let mult = 50. * dt;
+                            (mult * a.move_dir.x, mult * a.move_dir.y)
+                        };
+
+                        if (dx, dy) != (0., 0.) {
+                            let actor_bounds = a.shape.get_global_bounds();
+                            
+                            let desired_pos = FloatRect::new(actor_bounds.left + dx,
+                                                             actor_bounds.top + dy,
+                                                             actor_bounds.width,
+                                                             actor_bounds.height);
+                            let mut ok_to_move = true;
+                            for w in wagons.iter() {
+                                for t in w.tiles.iter() {
+                                    for t in t.iter() {
+                                        if !t.is_solid {
+                                            continue;
+                                        }
+                                        for b in t.bounds.iter() {
+                                            let b = if *b != None {
+                                                b.unwrap()
+                                            }
+                                            else {
+                                                continue;
+                                            };
+                                            if let Some(_) = desired_pos.intersects(
+                                                &FloatRect::new(b.left as f32 + t.sprite.get_position().x,
+                                                                b.top as f32 + t.sprite.get_position().y,
+                                                                b.width as f32,
+                                                                b.height as f32)) {
+                                                ok_to_move = false;
+                                                break;
+                                            }
+                                        }
+                                    }
+                                }
                             }
-                            if i == 1 {
-                                a.shape.move2f(50. * dt, -1. * dt);
+                            if ok_to_move && moving {
+                                a.shape.move2f(dx, dy);
                             }
-                        }
-                        a.inside_wagon = false;
-                        for w in wagons.iter() {
-                            for t in w.tiles.iter() {
-                                for t in t.iter() {
-                                    if !t.is_solid && t.sprite.get_global_bounds().contains(a.shape.get_position()) { 
-                                        a.inside_wagon = true;
-                                        break;
+
+                            a.inside_wagon = false;
+                            for w in wagons.iter() {
+                                for t in w.tiles.iter() {
+                                    for t in t.iter() {
+                                        if !t.is_solid && t.sprite.get_global_bounds().contains(a.shape.get_position()) { 
+                                            a.inside_wagon = true;
+                                            break;
+                                        }
                                     }
                                 }
                             }
                         }
-                        
 
                     }
 
