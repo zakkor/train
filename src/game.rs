@@ -133,15 +133,56 @@ impl<'a> Game<'a> {
                                 MouseButton::Right => {
                                     if let Some(selected_actor) = self.selected_actor {
                                         let move_to = self.window.get_mouse_position().to_vector2f();
-                                        let current_pos = self.actors[selected_actor].shape.get_position();
 
-                                        let mut move_dir = Vector2f::new(move_to.x - current_pos.x, move_to.y - current_pos.y);
-                                        let vec_len = (move_dir.x.powi(2) + move_dir.y.powi(2)).sqrt().abs();
+                                        let mut col_line = RectangleShape::new().unwrap();
 
-                                        move_dir.x = move_dir.x / vec_len;
-                                        move_dir.y = move_dir.y / vec_len;
+                                        let touch = self.window.map_pixel_to_coords_current_view(&self.window.get_mouse_position());
+                                        let center = self.actors[selected_actor].shape.get_position();
 
-                                        self.actors[selected_actor].move_dir = move_dir;
+                                        let delta_x = touch.x - center.x;
+                                        let delta_y = touch.y - center.y;
+                                        let theta_radians = delta_y.atan2(delta_x);
+                                        let theta_deg = theta_radians * 180. / 3.14;
+
+                                        let distance = (delta_x.powi(2) + delta_y.powi(2)).sqrt();
+                                        let diagonal = 25. * (2 as f32).sqrt();
+
+                                        col_line.set_size2f(distance, diagonal);
+                                        col_line.set_position2f(center.x,
+                                                                center.y);
+
+                                        col_line.set_origin2f(0., diagonal / 2.);
+
+                                        col_line.set_rotation(theta_deg);
+
+                                        let mut can_move_directly = true;
+                                        for w in self.train.wagons.iter() {
+                                            for t in w.tiles.iter() {
+                                                for t in t.iter() {
+                                                    if !t.is_solid {
+                                                        continue;
+                                                    }
+                                                    else {
+                                                        for b in t.bounds.iter() {
+                                                            if let Some(bound) = *b {
+                                                                if let Some(_) = col_line.get_global_bounds().intersects(
+                                                                    &FloatRect::new(bound.left as f32 + t.sprite.get_position().x,
+                                                                                    bound.top as f32 + t.sprite.get_position().y,
+                                                                                    bound.width as f32,
+                                                                                    bound.height as f32)) {
+                                                                    can_move_directly = false;
+                                                                    break;
+                                                                }
+                                                            }
+                                                        }
+                                                    }
+                                                }
+                                            }
+                                        }
+
+                                        if can_move_directly {
+                                            self.actors[selected_actor].destination = Some(move_to);
+                                        }
                                     }
                                 }
                                 _ => {}
@@ -245,9 +286,29 @@ impl<'a> Game<'a> {
             StateType::Playing => {
                 let dt = time.as_seconds();
                 for a in self.actors.iter_mut() {
+                    if let None = a.destination {
+                        continue;
+                    }
+
+                    let dest = a.destination.unwrap();
+
+                    let current_pos = a.shape.get_position();
+
+                    if (dest.x - current_pos.x).abs() < 1.
+                        && (dest.y - current_pos.y).abs() < 1. {
+                        a.destination = None;
+                        continue;
+                    }
+
+                    let mut move_dir = Vector2f::new(dest.x - current_pos.x, dest.y - current_pos.y);
+                    let vec_len = (move_dir.x.powi(2) + move_dir.y.powi(2)).sqrt().abs();
+
+                    move_dir.x = move_dir.x / vec_len;
+                    move_dir.y = move_dir.y / vec_len;
+
                     let (dx, dy) = {
                         let mult = 50. * dt;
-                        (mult * a.move_dir.x, mult * a.move_dir.y)
+                        (mult * move_dir.x, mult * move_dir.y)
                     };
 
                     if (dx, dy) != (0., 0.) {
