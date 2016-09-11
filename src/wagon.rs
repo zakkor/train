@@ -159,13 +159,47 @@ impl<'a> Drawable for Wagon<'a> {
                         shape.set_size2f(b.width as f32, b.height as f32);
                         shape.set_position2f(self.tiles[i][j].sprite.get_position().x + b.left as f32,
                                              self.tiles[i][j].sprite.get_position().y + b.top as f32);
-                        
+
                         render_target.draw(&shape);
                     }
-                    
                }
-            } 
+            }
         }
     }
 }
- 
+
+pub struct Train<'a> {
+    pub wagons: Vec<Wagon<'a>>,
+    pub moving: bool,
+    pub current_speed: f32,
+    pub top_speed: f32,
+    pub accel: f32,
+}
+
+impl<'a> Train<'a> {
+    pub fn new() -> Self {
+        Train {
+            wagons: vec![],
+            moving: false,
+            current_speed: 0.,
+            top_speed: 0.,
+            accel: 0.,
+        }
+    }
+
+    pub fn init(&mut self, top_speed: f32, accel: f32) {
+        self.top_speed = top_speed;
+        self.accel = accel;
+    }
+
+    pub fn update(&mut self) {
+        if self.moving {
+            if self.current_speed + self.accel < self.top_speed {
+                self.current_speed += self.accel;
+            }
+        }
+        else if self.current_speed > 0. {
+            self.current_speed -= self.accel * 2.;
+        }
+    }
+}
