@@ -89,6 +89,7 @@ impl<'a> Game<'a> {
         self.train.wagons.push(Wagon::new(&self.resources.tm, 3, 7));
 
         self.train.wagons[0].set_position2f(300., 300.);
+        self.train.wagons[0].tiles[0][3] = Tile::new();
         /*</test>*/
 
         {
@@ -181,7 +182,8 @@ impl<'a> Game<'a> {
                                         }
 
                                         if can_move_directly {
-                                            self.actors[selected_actor].destination = Some(move_to);
+                                            self.actors[selected_actor].move_seq.clear();
+                                            self.actors[selected_actor].move_seq.push_back(move_to);
                                         }
                                     }
                                 }
@@ -286,17 +288,16 @@ impl<'a> Game<'a> {
             StateType::Playing => {
                 let dt = time.as_seconds();
                 for a in self.actors.iter_mut() {
-                    if let None = a.destination {
+                    if a.move_seq.is_empty() {
                         continue;
                     }
 
-                    let dest = a.destination.unwrap();
-
                     let current_pos = a.shape.get_position();
 
+                    let dest = a.move_seq.front().unwrap().clone();
                     if (dest.x - current_pos.x).abs() < 1.
                         && (dest.y - current_pos.y).abs() < 1. {
-                        a.destination = None;
+                        a.move_seq.pop_front();
                         continue;
                     }
 

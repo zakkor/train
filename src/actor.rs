@@ -1,13 +1,14 @@
 extern crate sfml;
 use sfml::graphics::*;
 use sfml::system::*;
+use std::collections::VecDeque;
 
 use wagon::*;
 
 pub struct Actor<'a> {
     pub shape: RectangleShape<'a>,
     pub inside_wagon: bool,
-    pub destination: Option<Vector2f>,
+    pub move_seq: VecDeque<Vector2f>,
 }
 
 impl<'a> Actor<'a> {
@@ -21,7 +22,7 @@ impl<'a> Actor<'a> {
         Actor {
             shape: shape,
             inside_wagon: true,
-            destination: None,
+            move_seq: VecDeque::new(),
         }
     }
 }
