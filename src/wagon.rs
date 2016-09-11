@@ -4,7 +4,7 @@ use sfml::system::*;
 use sfml::window::*;
 
 use resource_manager::*;
-use {TILE_SIZE_X, TILE_SIZE_Y, WINDOW_SIZE_X, WINDOW_SIZE_Y};
+use game_consts::*;
 
 #[derive(Clone)]
 pub struct Tile<'a> {
@@ -37,13 +37,14 @@ pub struct Wagon<'a> {
     pub connected_to: [Option<&'a mut Wagon<'a>>; 2]
 }
 
+
 impl<'a> Wagon<'a> {
-    /// Creates a new wagon of size `size_x, size_y` and places all its tiles with the corner at (0,0).
+    //! Creates a new wagon of size `size_x, size_y` and places all its tiles with the corner at (0,0).
     pub fn new(tex_man: &'a TextureManager, size_x: u32, size_y: u32) -> Self {
         if size_y % 2 == 0 {
             panic!("wagon height needs to be an odd number");
         }
-        
+
         let mut tiles: Vec<Vec<Tile>> = vec![];
         for i in 0..(size_y + 2) {
             tiles.push(vec![]);
