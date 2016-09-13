@@ -1,3 +1,4 @@
+
 extern crate sfml;
 use sfml::graphics::*;
 use sfml::system::*;
@@ -5,6 +6,10 @@ use sfml::window::*;
 
 use resource_manager::*;
 use game_consts::*;
+use astar::*;
+
+use std::vec::IntoIter;
+use std::collections::VecDeque;
 
 #[derive(Clone)]
 pub struct Tile<'a> {
@@ -121,16 +126,15 @@ impl<'a> Wagon<'a> {
         let other_height = other.tiles.len();
         let other_width = other.tiles[0].len();
         let other_height_half = other_height / 2;
-        
+
         self.tiles[self_height_half - 1][0].sprite.set_texture(tex_man.get(TextureId::ConnectorTop), true);
         self.tiles[self_height_half - 1][0].bounds[1] = Some(IntRect::new(0, 58, 64, 6));
-        
+
         self.tiles[self_height_half][0].sprite.set_texture(tex_man.get(TextureId::Floor), true);
         self.tiles[self_height_half][0].is_solid = false;
-        
+
         self.tiles[self_height_half + 1][0].sprite.set_texture(tex_man.get(TextureId::ConnectorBottom), true);
         self.tiles[self_height_half + 1][0].bounds[1] = Some(IntRect::new(0, 0, 64, 6));
-        
 
         other.tiles[other_height_half - 1][other_width -1].sprite.set_texture(tex_man.get(TextureId::WallConnectedTop), true);
         other.tiles[other_height_half][other_width -1] = { let mut tile = Tile::new(); tile.is_solid = true; tile };
@@ -174,6 +178,7 @@ pub struct Train<'a> {
     pub current_speed: f32,
     pub top_speed: f32,
     pub accel: f32,
+    pub pfgrid: PathfindingGrid,
 }
 
 impl<'a> Train<'a> {
@@ -184,6 +189,7 @@ impl<'a> Train<'a> {
             current_speed: 0.,
             top_speed: 0.,
             accel: 0.,
+            pfgrid: PathfindingGrid::new()
         }
     }
 
@@ -202,4 +208,119 @@ impl<'a> Train<'a> {
             self.current_speed -= self.accel * 2.;
         }
     }
+}
+
+#[derive(Copy, Clone)]
+pub struct PathfindingTile {
+    pub walkable: bool,
+}
+
+pub struct PathfindingGrid {
+    pub grid: Vec<Vec<PathfindingTile>>,
+}
+
+impl PathfindingGrid {
+    pub fn new() -> Self {
+        PathfindingGrid {
+            grid: vec![]
+        }
+    }
+
+    pub fn rebuild_from(&mut self, wagons: &Vec<Wagon>) {
+        let (mut total_i, mut total_j) = (0, 0);
+
+        let mut total_height = 0;
+        let mut total_width = 0;
+
+        let mut max_height = 0;
+        for wag in wagons.iter() {
+            total_width += wag.tiles[0].len();
+            total_width -= 1;
+
+            if wag.tiles.len() > max_height {
+                max_height = wag.tiles.len();
+            }
+        }
+
+        total_height = max_height;
+        total_width += 1;
+//        max_height -=1;
+
+        self.grid = vec![vec![PathfindingTile{walkable:false}; total_height as usize]; total_width as usize];
+
+        let mut x_padding = 0;
+        let mut prev_train_width = 0;
+        for (w, wagon) in wagons.iter().rev().enumerate() {
+            let this_wagon_height = wagon.tiles.len();
+            for (i, t) in wagon.tiles.iter().enumerate() {
+                for (j, t) in t.iter().enumerate() {
+
+                    self.grid[j + prev_train_width][i + (max_height - this_wagon_height)/2].walkable = !t.is_solid;
+
+
+                }
+            }
+
+            prev_train_width += wagon.tiles[0].len() - 1;
+        }
+
+        //for (i, t) in self.grid.iter().enumerate() {
+        //    for (j, t) in t.iter().enumerate() {
+       //         print!("{},{} ", i, j);
+       //     }
+      //      println!("");
+      //  
+  // }
+    }
+}
+
+pub trait Walkable {
+    fn is_walkable(&self, x: i32, y: i32) -> bool;
+}
+
+impl Walkable for PathfindingGrid {
+    fn is_walkable(&self, x: i32, y: i32) -> bool {
+        self.grid[x as usize][y as usize].walkable
+    }
+}
+
+struct TrainSearch<'a> {
+    grid: &'a PathfindingGrid,
+    start: (i32, i32),
+    end: (i32, i32),
+}
+
+
+impl<'a> SearchProblem for TrainSearch<'a> {
+    type Node = (i32, i32);
+    type Cost = i32;
+    type Iter = IntoIter<((i32, i32), i32)>;
+    fn start(&self) -> (i32, i32) { self.start }
+    fn is_end(&self, p: &(i32, i32)) -> bool { *p == self.end }
+    fn heuristic(&self, &(p_x, p_y): &(i32, i32)) -> i32 {
+        let (s_x, s_y) = self.end;
+        (s_x - p_x).abs() + (s_y - p_y).abs()
+    }
+    fn neighbors(&mut self, &(x, y): &(i32, i32)) -> IntoIter<((i32, i32), i32)> {
+        let mut vec = vec![];
+        for i in -1 .. 1 + 1 {
+            for k in -1 .. 1 + 1 {
+                if !(i == 0 && k == 0) && self.grid.is_walkable(x + i, y + k)
+                    && !(i == -1 && k == -1)
+                    && !(i == -1 && k == 1)
+                    && !(i == 1 && k == -1)
+                    && !(i == 1 && k == 1){
+                        vec.push(((x + i, y + k), 1));
+                    }
+            }
+        }
+        vec.into_iter()
+    }
+}
+
+
+
+pub fn path(grid: &PathfindingGrid, start: (i32, i32), end: (i32, i32)) -> Option<VecDeque<(i32, i32)>> {
+    let mut ts = TrainSearch{grid: grid, start: start, end: end };
+    astar(&mut ts)
 }

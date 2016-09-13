@@ -26,6 +26,7 @@ pub struct Game<'a> {
     menu: Menu<'a>,
     world: World<'a>,
     camera: Camera,
+    tile_selection: RectangleShape<'a>,
 }
 
 impl<'a> Game<'a> {
@@ -42,6 +43,10 @@ impl<'a> Game<'a> {
         let mut state_stack = StateStack::new();
         state_stack.push(StateType::Playing);
 
+        let mut tile_selection = RectangleShape::new().unwrap();
+        tile_selection.set_size2f(TILE_SIZE_X as f32, TILE_SIZE_Y as f32);
+        tile_selection.set_fill_color(&Color::new_rgba(255, 255, 0, 140));
+
         Game {
             resources: resources,
             window: window,
@@ -53,7 +58,8 @@ impl<'a> Game<'a> {
             selected_actor: None,
             menu: Menu { buttons: vec![] },
             world: World { bgs: vec![] },
-            camera: Camera::new()
+            camera: Camera::new(),
+            tile_selection: tile_selection
         }
     }
 
@@ -85,17 +91,25 @@ impl<'a> Game<'a> {
         self.train.init(700., 0.8); // top speed, accel
 
         /*<test>*/
-        self.train.wagons.push(Wagon::new(&self.resources.tm, 5, 7));
-        self.train.wagons.push(Wagon::new(&self.resources.tm, 3, 7));
+        self.train.wagons.push(Wagon::new(&self.resources.tm, 4, 7));
+        self.train.wagons.push(Wagon::new(&self.resources.tm, 3, 5));
+        self.train.wagons.push(Wagon::new(&self.resources.tm, 3, 3));
 
-        self.train.wagons[0].set_position2f(300., 300.);
+        self.train.wagons[0].set_position2f(64. * 8., 0.);
         self.train.wagons[0].tiles[0][3] = Tile::new();
-        /*</test>*/
+        //         /*</test>*/
 
         {
             let (a, b) = self.train.wagons.split_at_mut(1);
             a[0].connect(&mut b[0], &self.resources.tm);
         }
+        {
+            let (a, b) = self.train.wagons.split_at_mut(2);
+            a[1].connect(&mut b[0], &self.resources.tm);
+        }
+
+//        let train_copy = self.train.clone();
+        self.train.pfgrid.rebuild_from(&self.train.wagons);
 
         self.actors.push(Actor::new());
     }
@@ -114,6 +128,11 @@ impl<'a> Game<'a> {
 
                     match event {
                         event::Closed => self.window.close(),
+                        event::MouseMoved { x, y, ..} => {
+                            if let Some(_) = self.selected_actor {
+                                self.tile_selection.set_position2f(((TILE_SIZE_X as u32) * (x as u32 / TILE_SIZE_X)) as f32, ((TILE_SIZE_Y as u32) * (y as u32 / TILE_SIZE_Y)) as f32);
+                            }
+                        }
                         event::MouseButtonPressed { button, .. } => {
                             match button {
                                 MouseButton::Left => {
@@ -133,57 +152,75 @@ impl<'a> Game<'a> {
                                 }
                                 MouseButton::Right => {
                                     if let Some(selected_actor) = self.selected_actor {
-                                        let move_to = self.window.get_mouse_position().to_vector2f();
+                                        
 
-                                        let mut col_line = RectangleShape::new().unwrap();
+                                        // let move_to = self.window.get_mouse_position().to_vector2f();
 
-                                        let touch = self.window.map_pixel_to_coords_current_view(&self.window.get_mouse_position());
-                                        let center = self.actors[selected_actor].shape.get_position();
+                                        // let mut col_line = RectangleShape::new().unwrap();
 
-                                        let delta_x = touch.x - center.x;
-                                        let delta_y = touch.y - center.y;
-                                        let theta_radians = delta_y.atan2(delta_x);
-                                        let theta_deg = theta_radians * 180. / 3.14;
+                                        
+                                        // let center = self.actors[selected_actor].shape.get_position();
 
-                                        let distance = (delta_x.powi(2) + delta_y.powi(2)).sqrt();
-                                        let diagonal = 25. * (2 as f32).sqrt();
+                                        // let delta_x = touch.x - center.x;
+                                        // let delta_y = touch.y - center.y;
+                                        // let theta_radians = delta_y.atan2(delta_x);
+                                        // let theta_deg = theta_radians * 180. / 3.14;
 
-                                        col_line.set_size2f(distance, diagonal);
-                                        col_line.set_position2f(center.x,
-                                                                center.y);
+                                        // let distance = (delta_x.powi(2) + delta_y.powi(2)).sqrt();
+                                        // let diagonal = 25. * (2 as f32).sqrt();
 
-                                        col_line.set_origin2f(0., diagonal / 2.);
+                                        // col_line.set_size2f(distance, diagonal);
+                                        // col_line.set_position2f(center.x,
+                                        //                         center.y);
 
-                                        col_line.set_rotation(theta_deg);
+                                        // col_line.set_origin2f(0., diagonal / 2.);
 
-                                        let mut can_move_directly = true;
-                                        for w in self.train.wagons.iter() {
-                                            for t in w.tiles.iter() {
-                                                for t in t.iter() {
-                                                    if !t.is_solid {
-                                                        continue;
-                                                    }
-                                                    else {
-                                                        for b in t.bounds.iter() {
-                                                            if let Some(bound) = *b {
-                                                                if let Some(_) = col_line.get_global_bounds().intersects(
-                                                                    &FloatRect::new(bound.left as f32 + t.sprite.get_position().x,
-                                                                                    bound.top as f32 + t.sprite.get_position().y,
-                                                                                    bound.width as f32,
-                                                                                    bound.height as f32)) {
-                                                                    can_move_directly = false;
-                                                                    break;
-                                                                }
-                                                            }
-                                                        }
-                                                    }
-                                                }
-                                            }
-                                        }
+                                        // col_line.set_rotation(theta_deg);
 
-                                        if can_move_directly {
-                                            self.actors[selected_actor].move_seq.clear();
-                                            self.actors[selected_actor].move_seq.push_back(move_to);
+                                        // let mut can_move_directly = true;
+                                        // for w in self.train.wagons.iter() {
+                                        //     for t in w.tiles.iter() {
+                                        //         for t in t.iter() {
+                                        //             if !t.is_solid {
+                                        //                 continue;
+                                        //             }
+                                        //             else {
+                                        //                 for b in t.bounds.iter() {
+                                        //                     if let Some(bound) = *b {
+                                        //                         if let Some(_) = col_line.get_global_bounds().intersects(
+                                        //                             &FloatRect::new(bound.left as f32 + t.sprite.get_position().x,
+                                        //                                             bound.top as f32 + t.sprite.get_position().y,
+                                        //                                             bound.width as f32,
+                                        //                                             bound.height as f32)) {
+                                        //                             can_move_directly = false;
+                                        //                             break;
+                                        //                         }
+                                        //                     }
+                                        //                 }
+                                        //             }
+                                        //         }
+                                        //     }
+                                        // }
+
+//                                        if can_move_directly {
+                                        //                                        self.actors[selected_actor].move_seq.clear();
+                                        //                                           self.actors[selected_actor].move_seq.push_back(move_to);
+
+                                        //                                      }
+
+                                        let selected_actor_pos = (self.actors[selected_actor].shape.get_position().x as i32 / TILE_SIZE_X as i32,
+                                                                  self.actors[selected_actor].shape.get_position().y as i32 / TILE_SIZE_Y as i32);
+
+                                        let click_pos = self.window.map_pixel_to_coords_current_view(&self.window.get_mouse_position());
+                                        let destination = (click_pos.x as i32 / TILE_SIZE_X as i32,
+                                                           click_pos.y as i32 / TILE_SIZE_Y as i32);
+
+                                        let path_seq = path(&self.train.pfgrid, selected_actor_pos, destination).unwrap();
+
+                                        for step in path_seq.iter() {
+                                            println!("{:?}", step);
+                                            self.actors[selected_actor].move_seq.push_back(Vector2f::new(step.0 as f32 * TILE_SIZE_X as f32 + TILE_SIZE_X as f32 / 2.,
+                                                                                                         step.1 as f32 * TILE_SIZE_Y as f32 + TILE_SIZE_Y as f32 / 2.));
                                         }
                                     }
                                 }
@@ -308,7 +345,7 @@ impl<'a> Game<'a> {
                     move_dir.y = move_dir.y / vec_len;
 
                     let (dx, dy) = {
-                        let mult = 50. * dt;
+                        let mult = 100. * dt;
                         (mult * move_dir.x, mult * move_dir.y)
                     };
 
@@ -408,6 +445,23 @@ impl<'a> Game<'a> {
                         self.window.draw(&a.shape);
                     }
                 }
+
+                for (i, t) in self.train.pfgrid.grid.iter().enumerate() {
+                    for (j, t) in t.iter().enumerate() {
+                        let mut shape = RectangleShape::new().unwrap();
+                        shape.set_size2f(64., 64.);
+                        shape.set_position2f(i as f32 * 64., j as f32 * 64.);
+
+                        if t.walkable {
+                            shape.set_fill_color(&Color::new_rgba(0, 255, 0, 120));
+                        } else {
+                            shape.set_fill_color(&Color::new_rgba(255, 0, 0, 120));
+                        }
+
+                        self.window.draw(&shape);
+                    }
+                }
+                self.window.draw(&self.tile_selection);
             },
             StateType::Menu => {
                 self.window.clear(&Color::black());

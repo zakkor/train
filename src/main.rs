@@ -1,8 +1,10 @@
 #![allow(dead_code)]
 #![allow(unused_imports)]
+#![feature(inclusive_range_syntax)]
 
 extern crate sfml;
 extern crate rand;
+extern crate astar;
 
 mod state_stack;
 mod resource_manager;
