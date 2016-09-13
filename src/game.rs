@@ -108,8 +108,7 @@ impl<'a> Game<'a> {
             a[1].connect(&mut b[0], &self.resources.tm);
         }
 
-//        let train_copy = self.train.clone();
-        self.train.pfgrid.rebuild_from(&self.train.wagons);
+        self.train.rebuild_pfgrid();
 
         self.actors.push(Actor::new());
     }
@@ -129,8 +128,10 @@ impl<'a> Game<'a> {
                     match event {
                         event::Closed => self.window.close(),
                         event::MouseMoved { x, y, ..} => {
+                            let coords = self.window.map_pixel_to_coords_current_view(&Vector2i::new(x, y));
                             if let Some(_) = self.selected_actor {
-                                self.tile_selection.set_position2f(((TILE_SIZE_X as u32) * (x as u32 / TILE_SIZE_X)) as f32, ((TILE_SIZE_Y as u32) * (y as u32 / TILE_SIZE_Y)) as f32);
+                                self.tile_selection.set_position2f(((TILE_SIZE_X as u32) * (coords.x as u32 / TILE_SIZE_X)) as f32,
+                                                                   ((TILE_SIZE_Y as u32) * (coords.y as u32 / TILE_SIZE_Y)) as f32);
                             }
                         }
                         event::MouseButtonPressed { button, .. } => {
@@ -152,13 +153,10 @@ impl<'a> Game<'a> {
                                 }
                                 MouseButton::Right => {
                                     if let Some(selected_actor) = self.selected_actor {
-                                        
-
                                         // let move_to = self.window.get_mouse_position().to_vector2f();
 
                                         // let mut col_line = RectangleShape::new().unwrap();
 
-                                        
                                         // let center = self.actors[selected_actor].shape.get_position();
 
                                         // let delta_x = touch.x - center.x;
@@ -215,10 +213,10 @@ impl<'a> Game<'a> {
                                         let destination = (click_pos.x as i32 / TILE_SIZE_X as i32,
                                                            click_pos.y as i32 / TILE_SIZE_Y as i32);
 
-                                        let path_seq = path(&self.train.pfgrid, selected_actor_pos, destination).unwrap();
+                                        self.actors[selected_actor].move_seq.clear();
 
+                                        let path_seq = path(&self.train.pfgrid, selected_actor_pos, destination).unwrap();
                                         for step in path_seq.iter() {
-                                            println!("{:?}", step);
                                             self.actors[selected_actor].move_seq.push_back(Vector2f::new(step.0 as f32 * TILE_SIZE_X as f32 + TILE_SIZE_X as f32 / 2.,
                                                                                                          step.1 as f32 * TILE_SIZE_Y as f32 + TILE_SIZE_Y as f32 / 2.));
                                         }
@@ -446,21 +444,21 @@ impl<'a> Game<'a> {
                     }
                 }
 
-                for (i, t) in self.train.pfgrid.grid.iter().enumerate() {
-                    for (j, t) in t.iter().enumerate() {
-                        let mut shape = RectangleShape::new().unwrap();
-                        shape.set_size2f(64., 64.);
-                        shape.set_position2f(i as f32 * 64., j as f32 * 64.);
+                // for (i, t) in self.train.pfgrid.grid.iter().enumerate() {
+                //     for (j, t) in t.iter().enumerate() {
+                //         let mut shape = RectangleShape::new().unwrap();
+                //         shape.set_size2f(64., 64.);
+                //         shape.set_position2f(i as f32 * 64., j as f32 * 64.);
 
-                        if t.walkable {
-                            shape.set_fill_color(&Color::new_rgba(0, 255, 0, 120));
-                        } else {
-                            shape.set_fill_color(&Color::new_rgba(255, 0, 0, 120));
-                        }
+                //         if t.walkable {
+                //             shape.set_fill_color(&Color::new_rgba(0, 255, 0, 120));
+                //         } else {
+                //             shape.set_fill_color(&Color::new_rgba(255, 0, 0, 120));
+                //         }
 
-                        self.window.draw(&shape);
-                    }
-                }
+                //         self.window.draw(&shape);
+                //     }
+                // }
                 self.window.draw(&self.tile_selection);
             },
             StateType::Menu => {

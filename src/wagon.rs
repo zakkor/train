@@ -208,6 +208,36 @@ impl<'a> Train<'a> {
             self.current_speed -= self.accel * 2.;
         }
     }
+
+    pub fn rebuild_pfgrid(&mut self) {
+        let mut total_width = 0;
+        let mut max_height = 0;
+
+        for wag in self.wagons.iter() {
+            total_width += wag.tiles[0].len();
+            total_width -= 1;
+
+            if wag.tiles.len() > max_height {
+                max_height = wag.tiles.len();
+            }
+        }
+
+        total_width += 1;
+
+        self.pfgrid.grid = vec![vec![PathfindingTile{ walkable:false }; max_height as usize]; total_width as usize];
+
+        let mut prev_train_width = 0;
+        for wagon in self.wagons.iter().rev() {
+            let this_wagon_height = wagon.tiles.len();
+            for (i, t) in wagon.tiles.iter().enumerate() {
+                for (j, t) in t.iter().enumerate() {
+                    self.pfgrid.grid[j + prev_train_width][i + (max_height - this_wagon_height)/2].walkable = !t.is_solid;
+                }
+            }
+
+            prev_train_width += wagon.tiles[0].len() - 1;
+        }
+    }
 }
 
 #[derive(Copy, Clone)]
@@ -226,60 +256,7 @@ impl PathfindingGrid {
         }
     }
 
-    pub fn rebuild_from(&mut self, wagons: &Vec<Wagon>) {
-        let (mut total_i, mut total_j) = (0, 0);
-
-        let mut total_height = 0;
-        let mut total_width = 0;
-
-        let mut max_height = 0;
-        for wag in wagons.iter() {
-            total_width += wag.tiles[0].len();
-            total_width -= 1;
-
-            if wag.tiles.len() > max_height {
-                max_height = wag.tiles.len();
-            }
-        }
-
-        total_height = max_height;
-        total_width += 1;
-//        max_height -=1;
-
-        self.grid = vec![vec![PathfindingTile{walkable:false}; total_height as usize]; total_width as usize];
-
-        let mut x_padding = 0;
-        let mut prev_train_width = 0;
-        for (w, wagon) in wagons.iter().rev().enumerate() {
-            let this_wagon_height = wagon.tiles.len();
-            for (i, t) in wagon.tiles.iter().enumerate() {
-                for (j, t) in t.iter().enumerate() {
-
-                    self.grid[j + prev_train_width][i + (max_height - this_wagon_height)/2].walkable = !t.is_solid;
-
-
-                }
-            }
-
-            prev_train_width += wagon.tiles[0].len() - 1;
-        }
-
-        //for (i, t) in self.grid.iter().enumerate() {
-        //    for (j, t) in t.iter().enumerate() {
-       //         print!("{},{} ", i, j);
-       //     }
-      //      println!("");
-      //  
-  // }
-    }
-}
-
-pub trait Walkable {
-    fn is_walkable(&self, x: i32, y: i32) -> bool;
-}
-
-impl Walkable for PathfindingGrid {
-    fn is_walkable(&self, x: i32, y: i32) -> bool {
+    pub fn is_walkable(&self, x: i32, y: i32) -> bool {
         self.grid[x as usize][y as usize].walkable
     }
 }
@@ -289,7 +266,6 @@ struct TrainSearch<'a> {
     start: (i32, i32),
     end: (i32, i32),
 }
-
 
 impl<'a> SearchProblem for TrainSearch<'a> {
     type Node = (i32, i32);
@@ -306,10 +282,11 @@ impl<'a> SearchProblem for TrainSearch<'a> {
         for i in -1 .. 1 + 1 {
             for k in -1 .. 1 + 1 {
                 if !(i == 0 && k == 0) && self.grid.is_walkable(x + i, y + k)
+                    // fucking corners
                     && !(i == -1 && k == -1)
                     && !(i == -1 && k == 1)
                     && !(i == 1 && k == -1)
-                    && !(i == 1 && k == 1){
+                    && !(i == 1 && k == 1) {
                         vec.push(((x + i, y + k), 1));
                     }
             }
@@ -317,8 +294,6 @@ impl<'a> SearchProblem for TrainSearch<'a> {
         vec.into_iter()
     }
 }
-
-
 
 pub fn path(grid: &PathfindingGrid, start: (i32, i32), end: (i32, i32)) -> Option<VecDeque<(i32, i32)>> {
     let mut ts = TrainSearch{grid: grid, start: start, end: end };
