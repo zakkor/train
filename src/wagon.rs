@@ -159,7 +159,7 @@ impl<'a> Drawable for Wagon<'a> {
                             continue;
                         };
                         let mut shape = RectangleShape::new().unwrap();
-                        shape.set_fill_color(&Color::new_rgba(255, 0, 0, 100));
+                        shape.set_fill_color(&Color::new_rgba(0, 0, 255, 100));
                         shape.set_size2f(b.width as f32, b.height as f32);
                         shape.set_position2f(self.tiles[i][j].sprite.get_position().x + b.left as f32,
                                              self.tiles[i][j].sprite.get_position().y + b.top as f32);
@@ -178,7 +178,8 @@ pub struct Train<'a> {
     pub current_speed: f32,
     pub top_speed: f32,
     pub accel: f32,
-    pub pfgrid: PathfindingGrid,
+    pub pfgrid_in: PathfindingGrid,
+    pub pfgrid_out: PathfindingGrid,
 }
 
 impl<'a> Train<'a> {
@@ -189,7 +190,8 @@ impl<'a> Train<'a> {
             current_speed: 0.,
             top_speed: 0.,
             accel: 0.,
-            pfgrid: PathfindingGrid::new()
+            pfgrid_in: PathfindingGrid::new(),
+            pfgrid_out: PathfindingGrid::new()
         }
     }
 
@@ -209,7 +211,7 @@ impl<'a> Train<'a> {
         }
     }
 
-    pub fn rebuild_pfgrid(&mut self) {
+    pub fn rebuild_pfgrids(&mut self) {
         let mut total_width = 0;
         let mut max_height = 0;
 
@@ -224,18 +226,26 @@ impl<'a> Train<'a> {
 
         total_width += 1;
 
-        self.pfgrid.grid = vec![vec![PathfindingTile{ walkable:false }; max_height as usize]; total_width as usize];
+        self.pfgrid_in.grid = vec![vec![PathfindingTile{ walkable:false }; max_height as usize]; total_width as usize];
 
         let mut prev_train_width = 0;
         for wagon in self.wagons.iter().rev() {
             let this_wagon_height = wagon.tiles.len();
             for (i, t) in wagon.tiles.iter().enumerate() {
                 for (j, t) in t.iter().enumerate() {
-                    self.pfgrid.grid[j + prev_train_width][i + (max_height - this_wagon_height)/2].walkable = !t.is_solid;
+                    self.pfgrid_in.grid[j + prev_train_width][i + (max_height - this_wagon_height)/2].walkable = !t.is_solid;
                 }
             }
-
             prev_train_width += wagon.tiles[0].len() - 1;
+        }
+
+        self.pfgrid_out = self.pfgrid_in.clone();
+        for (i, pft) in self.pfgrid_out.grid.iter_mut().enumerate() {
+            for (j, pft) in pft.iter_mut().enumerate() {
+                if !(i == 2 && j == 7) {
+                    pft.walkable = !pft.walkable;
+                }
+            }
         }
     }
 }
@@ -245,6 +255,7 @@ pub struct PathfindingTile {
     pub walkable: bool,
 }
 
+#[derive(Clone)]
 pub struct PathfindingGrid {
     pub grid: Vec<Vec<PathfindingTile>>,
 }
@@ -252,12 +263,19 @@ pub struct PathfindingGrid {
 impl PathfindingGrid {
     pub fn new() -> Self {
         PathfindingGrid {
-            grid: vec![]
+            grid: vec![],
         }
     }
+}
 
-    pub fn is_walkable(&self, x: i32, y: i32) -> bool {
-        self.grid[x as usize][y as usize].walkable
+pub trait Walkable {
+    fn is_walkable(&self, x: i32, y: i32) -> bool;
+}
+
+impl Walkable for Vec<Vec<PathfindingTile>> {
+    fn is_walkable(&self, x: i32, y: i32) -> bool
+    {
+        self[x as usize][y as usize].walkable
     }
 }
 
@@ -281,12 +299,15 @@ impl<'a> SearchProblem for TrainSearch<'a> {
         let mut vec = vec![];
         for i in -1 .. 1 + 1 {
             for k in -1 .. 1 + 1 {
-                if !(i == 0 && k == 0) && self.grid.is_walkable(x + i, y + k)
+                if !(i == 0 && k == 0)
                     // fucking corners
                     && !(i == -1 && k == -1)
                     && !(i == -1 && k == 1)
                     && !(i == 1 && k == -1)
-                    && !(i == 1 && k == 1) {
+                    && !(i == 1 && k == 1)
+                    && x + i >= 0 && y + k >= 0
+                    && x + i < self.grid.grid.len() as i32 && y + k < self.grid.grid[0].len() as i32
+                    && self.grid.grid.is_walkable(x + i, y + k) {
                         vec.push(((x + i, y + k), 1));
                     }
             }

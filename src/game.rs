@@ -93,23 +93,27 @@ impl<'a> Game<'a> {
         /*<test>*/
         self.train.wagons.push(Wagon::new(&self.resources.tm, 4, 7));
         self.train.wagons.push(Wagon::new(&self.resources.tm, 3, 5));
-        self.train.wagons.push(Wagon::new(&self.resources.tm, 3, 3));
+//        self.train.wagons.push(Wagon::new(&self.resources.tm, 3, 3));
 
-        self.train.wagons[0].set_position2f(64. * 8., 0.);
-        self.train.wagons[0].tiles[0][3] = Tile::new();
+        self.train.wagons[0].set_position2f(64. * 4., 0.);
+        self.train.wagons[1].tiles[6][2] = Tile::new();
         //         /*</test>*/
 
         {
             let (a, b) = self.train.wagons.split_at_mut(1);
             a[0].connect(&mut b[0], &self.resources.tm);
         }
-        {
-            let (a, b) = self.train.wagons.split_at_mut(2);
-            a[1].connect(&mut b[0], &self.resources.tm);
-        }
+        // {
+        //     let (a, b) = self.train.wagons.split_at_mut(2);
+        //     a[1].connect(&mut b[0], &self.resources.tm);
+        // }
 
-        self.train.rebuild_pfgrid();
+        self.train.rebuild_pfgrids();
 
+        self.actors.push(Actor::new());
+        self.actors.push(Actor::new());
+        self.actors.push(Actor::new());
+        self.actors.push(Actor::new());
         self.actors.push(Actor::new());
     }
 
@@ -153,11 +157,13 @@ impl<'a> Game<'a> {
                                 }
                                 MouseButton::Right => {
                                     if let Some(selected_actor) = self.selected_actor {
+                                        
                                         // let move_to = self.window.get_mouse_position().to_vector2f();
 
                                         // let mut col_line = RectangleShape::new().unwrap();
 
                                         // let center = self.actors[selected_actor].shape.get_position();
+                                        // let touch = self.window.map_pixel_to_coords_current_view(&self.window.get_mouse_position());
 
                                         // let delta_x = touch.x - center.x;
                                         // let delta_y = touch.y - center.y;
@@ -200,11 +206,11 @@ impl<'a> Game<'a> {
                                         //     }
                                         // }
 
-//                                        if can_move_directly {
-                                        //                                        self.actors[selected_actor].move_seq.clear();
-                                        //                                           self.actors[selected_actor].move_seq.push_back(move_to);
-
-                                        //                                      }
+                                        // if can_move_directly {
+                                        //     self.actors[selected_actor].move_seq.clear();
+                                        //     self.actors[selected_actor].move_seq.push_back(move_to);
+                                        // }
+                                        
 
                                         let selected_actor_pos = (self.actors[selected_actor].shape.get_position().x as i32 / TILE_SIZE_X as i32,
                                                                   self.actors[selected_actor].shape.get_position().y as i32 / TILE_SIZE_Y as i32);
@@ -215,10 +221,18 @@ impl<'a> Game<'a> {
 
                                         self.actors[selected_actor].move_seq.clear();
 
-                                        let path_seq = path(&self.train.pfgrid, selected_actor_pos, destination).unwrap();
-                                        for step in path_seq.iter() {
-                                            self.actors[selected_actor].move_seq.push_back(Vector2f::new(step.0 as f32 * TILE_SIZE_X as f32 + TILE_SIZE_X as f32 / 2.,
-                                                                                                         step.1 as f32 * TILE_SIZE_Y as f32 + TILE_SIZE_Y as f32 / 2.));
+                                        let path_seq =
+                                            if self.actors[selected_actor].inside_wagon {
+                                                path(&self.train.pfgrid_in, selected_actor_pos, destination)
+                                            } else {
+                                                path(&self.train.pfgrid_out, selected_actor_pos, destination)
+                                            };
+
+                                        if let Some(path) = path_seq {
+                                            for step in path.iter() {
+                                                self.actors[selected_actor].move_seq.push_back(Vector2f::new(step.0 as f32 * TILE_SIZE_X as f32 + TILE_SIZE_X as f32 / 2.,
+                                                                                                             step.1 as f32 * TILE_SIZE_Y as f32 + TILE_SIZE_Y as f32 / 2.));
+                                            }
                                         }
                                     }
                                 }
@@ -444,21 +458,43 @@ impl<'a> Game<'a> {
                     }
                 }
 
-                // for (i, t) in self.train.pfgrid.grid.iter().enumerate() {
-                //     for (j, t) in t.iter().enumerate() {
-                //         let mut shape = RectangleShape::new().unwrap();
-                //         shape.set_size2f(64., 64.);
-                //         shape.set_position2f(i as f32 * 64., j as f32 * 64.);
+                if let Some(selected_actor) = self.selected_actor {
+                    if self.actors[selected_actor].inside_wagon {
+                        for (i, t) in self.train.pfgrid_in.grid.iter().enumerate() {
+                            for (j, t) in t.iter().enumerate() {
+                                let mut shape = RectangleShape::new().unwrap();
+                                shape.set_size2f(64., 64.);
+                                shape.set_position2f(i as f32 * 64., j as f32 * 64.);
 
-                //         if t.walkable {
-                //             shape.set_fill_color(&Color::new_rgba(0, 255, 0, 120));
-                //         } else {
-                //             shape.set_fill_color(&Color::new_rgba(255, 0, 0, 120));
-                //         }
+                                if t.walkable {
+                                    shape.set_fill_color(&Color::new_rgba(0, 255, 0, 120));
+                                } else {
+                                    shape.set_fill_color(&Color::new_rgba(255, 0, 0, 120));
+                                }
 
-                //         self.window.draw(&shape);
-                //     }
-                // }
+                                self.window.draw(&shape);
+                            }
+                        }
+                    } else {
+                        for (i, t) in self.train.pfgrid_out.grid.iter().enumerate() {
+                            for (j, t) in t.iter().enumerate() {
+                                let mut shape = RectangleShape::new().unwrap();
+                                shape.set_size2f(64., 64.);
+                                shape.set_position2f(i as f32 * 64., j as f32 * 64.);
+
+                                if t.walkable {
+                                    shape.set_fill_color(&Color::new_rgba(0, 255, 0, 120));
+                                } else {
+                                    shape.set_fill_color(&Color::new_rgba(255, 0, 0, 120));
+                                }
+
+                                self.window.draw(&shape);
+                            }
+                        }
+                    }
+                }
+
+
                 self.window.draw(&self.tile_selection);
             },
             StateType::Menu => {

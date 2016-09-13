@@ -16,7 +16,7 @@ impl<'a> Actor<'a> {
         let mut shape = RectangleShape::new().unwrap();
         shape.set_size2f(25., 25.);
         shape.set_fill_color(&Color::red());
-        shape.set_position2f(1280. / 2. - 25., 720. - 200. - 50.);
+        shape.set_position2f(1280. / 2. - 100., 720. - 200. - 50.);
         shape.set_origin2f(25./2., 25./2.);
 
         Actor {
