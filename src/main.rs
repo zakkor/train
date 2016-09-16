@@ -8,7 +8,8 @@ extern crate astar;
 
 mod state_stack;
 mod resource_manager;
-use resource_manager::Resources;
+use resource_manager::{MusicManager, MusicId, Resources};
+
 mod particle_manager;
 mod actor;
 mod menu;
@@ -28,7 +29,11 @@ mod game_consts {
 
 fn main() {
     let resources = Resources::new();
-    let mut game = Game::new(&resources);
+    let mut music_manager = MusicManager::new();
+    music_manager.load(MusicId::Train, "res/train.ogg");
+    music_manager.load(MusicId::Screech, "res/screech.ogg");
+
+    let mut game = Game::new(&resources, &mut music_manager);
 
     game.run().unwrap();
 }

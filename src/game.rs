@@ -3,6 +3,7 @@ use rand::Rng;
 use sfml::graphics::*;
 use sfml::system::*;
 use sfml::window::*;
+use sfml::audio::*;
 
 use state_stack::*;
 use resource_manager::*;
@@ -16,6 +17,7 @@ use camera::*;
 
 pub struct Game<'a> {
     resources: &'a Resources,
+    music_manager: &'a mut MusicManager,
     window: RenderWindow,
     state_stack: StateStack,
     pm: ParticleManager<'a>,
@@ -30,7 +32,7 @@ pub struct Game<'a> {
 }
 
 impl<'a> Game<'a> {
-    pub fn new(resources: &'a Resources) -> Self {
+    pub fn new(resources: &'a Resources, music_manager: &'a mut MusicManager) -> Self {
         // Create the window of the application
         let mut window = RenderWindow::new(VideoMode::new_init(WINDOW_SIZE_X, WINDOW_SIZE_Y, 32),
                                            "Train",
@@ -49,6 +51,7 @@ impl<'a> Game<'a> {
 
         Game {
             resources: resources,
+            music_manager: music_manager,
             window: window,
             state_stack: state_stack,
             pm: ParticleManager::new(),
@@ -57,7 +60,7 @@ impl<'a> Game<'a> {
             actors: vec![],
             selected_actor: None,
             menu: Menu { buttons: vec![] },
-            world: World { bgs: vec![] },
+            world: World { bgs: vec![], rails: vec![] },
             camera: Camera::new(),
             tile_selection: tile_selection
         }
@@ -91,7 +94,7 @@ impl<'a> Game<'a> {
         self.train.init(700., 0.8); // top speed, accel
 
         /*<test>*/
-        self.train.wagons.push(Wagon::new(&self.resources.tm, 4, 7));
+        self.train.wagons.push(Wagon::new(&self.resources.tm, 4, 5));
         self.train.wagons.push(Wagon::new(&self.resources.tm, 3, 5));
 //        self.train.wagons.push(Wagon::new(&self.resources.tm, 3, 3));
 
@@ -110,11 +113,9 @@ impl<'a> Game<'a> {
 
         self.train.rebuild_pfgrids();
 
-        self.actors.push(Actor::new());
-        self.actors.push(Actor::new());
-        self.actors.push(Actor::new());
-        self.actors.push(Actor::new());
-        self.actors.push(Actor::new());
+        self.actors = vec![Actor::new(), Actor::new(), Actor::new(), Actor::new()];
+
+//        self.train.screech_snd = Some(self.music_manager.get_mut(MusicId::Screech));
     }
 
     fn process_events(&mut self) {
@@ -196,6 +197,29 @@ impl<'a> Game<'a> {
                             }
                             if let Key::Space = code {
                                 self.train.moving = !self.train.moving;
+                                // {
+                                //     let mut train_sound = self.music_manager.get_mut(MusicId::Train);
+                                //     train_sound.set_loop(true);
+                                //     train_sound.set_volume(25.);
+                                //     if train_sound.get_status() == SoundStatus::Stopped {
+                                //         train_sound.play();
+                                //     } else {
+                                //         train_sound.stop();
+                                //     }
+                                // }
+
+                                // {
+                                //     if !self.train.moving {
+                                //         let mut screech_sound = self.music_manager.get_mut(MusicId::Screech);
+                                //         screech_sound.set_loop(true);
+                                //         screech_sound.set_volume(25.);
+                                //         if screech_sound.get_status() == SoundStatus::Stopped {
+                                //             screech_sound.play();
+                                //         } else {
+                                //             screech_sound.stop();
+                                //         }
+                                //     }
+                                // }
                             }
                         }
                         _ => {}
@@ -283,80 +307,7 @@ impl<'a> Game<'a> {
             StateType::Playing => {
                 let dt = time.as_seconds();
                 for a in self.actors.iter_mut() {
-                    if a.move_seq.is_empty() {
-                        continue;
-                    }
-
-                    let current_pos = a.shape.get_position();
-
-                    let dest = a.move_seq.front().unwrap().clone();
-                    if (dest.x - current_pos.x).abs() < 1.
-                        && (dest.y - current_pos.y).abs() < 1. {
-                        a.move_seq.pop_front();
-                        continue;
-                    }
-
-                    let mut move_dir = Vector2f::new(dest.x - current_pos.x, dest.y - current_pos.y);
-                    let vec_len = (move_dir.x.powi(2) + move_dir.y.powi(2)).sqrt().abs();
-
-                    move_dir.x = move_dir.x / vec_len;
-                    move_dir.y = move_dir.y / vec_len;
-
-                    let (dx, dy) = {
-                        let mult = 100. * dt;
-                        (mult * move_dir.x, mult * move_dir.y)
-                    };
-
-                    if (dx, dy) != (0., 0.) {
-                        let actor_bounds = a.shape.get_global_bounds();
-
-                        let desired_pos = FloatRect::new(actor_bounds.left + dx,
-                                                         actor_bounds.top + dy,
-                                                         actor_bounds.width,
-                                                         actor_bounds.height);
-                        let mut ok_to_move = true;
-                        for w in self.train.wagons.iter() {
-                            for t in w.tiles.iter() {
-                                for t in t.iter() {
-                                    if !t.is_solid {
-                                        continue;
-                                    }
-                                    for b in t.bounds.iter() {
-                                        let b = if *b != None {
-                                            b.unwrap()
-                                        }
-                                        else {
-                                            continue;
-                                        };
-                                        if let Some(_) = desired_pos.intersects(
-                                            &FloatRect::new(b.left as f32 + t.sprite.get_position().x,
-                                                            b.top as f32 + t.sprite.get_position().y,
-                                                            b.width as f32,
-                                                            b.height as f32)) {
-                                            ok_to_move = false;
-                                            break;
-                                        }
-                                    }
-                                }
-                            }
-                        }
-
-                        if ok_to_move {
-                            a.shape.move2f(dx, dy);
-                        }
-
-                        a.inside_wagon = false;
-                        for w in self.train.wagons.iter() {
-                            for t in w.tiles.iter() {
-                                for t in t.iter() {
-                                    if !t.is_solid && t.sprite.get_global_bounds().contains(a.shape.get_position()) {
-                                        a.inside_wagon = true;
-                                        break;
-                                    }
-                                }
-                            }
-                        }
-                    }
+                    a.update_movement(&self.train.wagons, dt);
                 }
 
                 self.world.update();
@@ -365,6 +316,10 @@ impl<'a> Game<'a> {
 
                 for bg in self.world.bgs.iter_mut() {
                     bg.move2f(dt * -self.train.current_speed, 0.);
+                }
+
+                for rail in self.world.rails.iter_mut() {
+                    rail.move2f(dt * -self.train.current_speed, 0.);
                 }
 
                 for a in self.actors.iter_mut() {
@@ -384,8 +339,12 @@ impl<'a> Game<'a> {
                 // Clear the window
                 self.window.clear(&Color::yellow());
 
-                for bg in self.world.bgs.iter_mut() {
+                for bg in self.world.bgs.iter() {
                     self.window.draw(bg);
+                }
+
+                for rail in self.world.rails.iter() {
+                    self.window.draw(rail);
                 }
 
                 for a in self.actors.iter() {
@@ -405,41 +364,24 @@ impl<'a> Game<'a> {
                 }
 
                 if let Some(selected_actor) = self.selected_actor {
-                    if self.actors[selected_actor].inside_wagon {
-                        for (i, t) in self.train.pfgrid_in.grid.iter().enumerate() {
-                            for (j, t) in t.iter().enumerate() {
-                                let mut shape = RectangleShape::new().unwrap();
-                                shape.set_size2f(64., 64.);
-                                shape.set_position2f(i as f32 * 64., j as f32 * 64.);
+                    for (i, t) in
+                        if self.actors[selected_actor].inside_wagon { self.train.pfgrid_in.grid.iter().enumerate() }
+                    else { self.train.pfgrid_out.grid.iter().enumerate() } {
+                        for (j, t) in t.iter().enumerate() {
+                            let mut shape = RectangleShape::new().unwrap();
+                            shape.set_size2f(64., 64.);
+                            shape.set_position2f(i as f32 * 64., j as f32 * 64.);
 
-                                if t.walkable {
-                                    shape.set_fill_color(&Color::new_rgba(0, 255, 0, 120));
-                                } else {
-                                    shape.set_fill_color(&Color::new_rgba(255, 0, 0, 120));
-                                }
-
-                                self.window.draw(&shape);
+                            if t.walkable {
+                                shape.set_fill_color(&Color::new_rgba(0, 255, 0, 120));
+                            } else {
+                                shape.set_fill_color(&Color::new_rgba(255, 0, 0, 120));
                             }
-                        }
-                    } else {
-                        for (i, t) in self.train.pfgrid_out.grid.iter().enumerate() {
-                            for (j, t) in t.iter().enumerate() {
-                                let mut shape = RectangleShape::new().unwrap();
-                                shape.set_size2f(64., 64.);
-                                shape.set_position2f(i as f32 * 64., j as f32 * 64.);
 
-                                if t.walkable {
-                                    shape.set_fill_color(&Color::new_rgba(0, 255, 0, 120));
-                                } else {
-                                    shape.set_fill_color(&Color::new_rgba(255, 0, 0, 120));
-                                }
-
-                                self.window.draw(&shape);
-                            }
+                            self.window.draw(&shape);
                         }
                     }
                 }
-
 
                 self.window.draw(&self.tile_selection);
             },

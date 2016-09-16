@@ -2,6 +2,7 @@ use std::collections::HashMap;
 use std::hash::Hash;
 extern crate sfml;
 use sfml::graphics::{Texture, Font};
+use sfml::audio::{Music};
 
 pub trait Resource: Sized {
     fn new_from_file(filename: &str) -> Option<Self>;
@@ -19,26 +20,41 @@ impl Resource for Font {
     }
 }
 
+impl Resource for Music {
+    fn new_from_file(filename: &str) -> Option<Self> {
+        Music::new_from_file(filename)
+    }
+}
+
 pub struct ResourceManager<I, R> {
-    resource_map: HashMap<I, Box<R>>
+    resource_map: HashMap<I, R>
 }
 
 impl<I: Eq + Hash, R: Resource> ResourceManager<I, R> {
     pub fn new() -> Self {
         ResourceManager {
-            resource_map: HashMap::<I, Box<R>>::new()
+            resource_map: HashMap::<I, R>::new()
         }
     }
 
-    pub fn load(&mut self, identifier: I, filename: & str) {
+    pub fn load(&mut self, identifier: I, filename: &str) {
         let resource = R::new_from_file(filename).unwrap();
-        self.resource_map.insert(identifier, Box::new(resource));
+        self.resource_map.insert(identifier, resource);
     }
 
-    pub fn get(&self, identifier: I) -> &Box<R> {
-        match self.resource_map.get(&identifier) {
-            Some(resource) => resource,
-            None => panic!("Tried to access nonexistant index in resource map")
+    pub fn get(&self, identifier: I) -> &R {
+        if let Some(resource) = self.resource_map.get(&identifier) {
+            resource
+        } else {
+            panic!("Tried to access nonexistant index in resource map")
+        }
+    }
+
+    pub fn get_mut(&mut self, identifier: I) -> &mut R {
+        if let Some(resource) = self.resource_map.get_mut(&identifier) {
+            resource
+        } else {
+            panic!("Tried to access nonexistant index in resource map")
         }
     }
 }
@@ -66,9 +82,15 @@ pub enum FontId {
     Joystix
 }
 
+#[derive(PartialEq, Eq, Hash)]
+pub enum MusicId {
+    Train,
+    Screech,
+}
+
 pub type TextureManager = ResourceManager<TextureId, Texture>;
 pub type FontManager = ResourceManager<FontId, Font>;
-
+pub type MusicManager = ResourceManager<MusicId, Music>;
 
 pub struct Resources {
     pub fm: FontManager,

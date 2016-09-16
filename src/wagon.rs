@@ -3,6 +3,7 @@ extern crate sfml;
 use sfml::graphics::*;
 use sfml::system::*;
 use sfml::window::*;
+use sfml::audio::*;
 
 use resource_manager::*;
 use game_consts::*;
@@ -15,7 +16,7 @@ use std::collections::VecDeque;
 pub struct Tile<'a> {
     pub sprite: Sprite<'a>,
     pub is_solid: bool,
-    pub bounds: [Option<IntRect>; 2]
+    pub bounds: [Option<FloatRect>; 2]
 }
 
 impl<'a> Tile<'a> {
@@ -60,36 +61,36 @@ impl<'a> Wagon<'a> {
 
                 if (i, j) == (0, 0) {
                     tile.sprite.set_texture(tex_man.get(TextureId::CornerTopLeft), true);
-                    tile.bounds[0] = Some(IntRect::new(58, 58, 6, 6));
+                    tile.bounds[0] = Some(FloatRect::new(58., 58., 6., 6.));
                 }
                 else if (i, j) == (size_y + 1, 0) {
                     tile.sprite.set_texture(tex_man.get(TextureId::CornerBottomLeft), true);
 
-                    tile.bounds[0] = Some(IntRect::new(58, 0, 6, 6));
+                    tile.bounds[0] = Some(FloatRect::new(58., 0., 6., 6.));
                 }
                 else if (i, j) == (0, size_x + 1) {
                     tile.sprite.set_texture(tex_man.get(TextureId::CornerTopRight), true);
-                    tile.bounds[0] = Some(IntRect::new(0, 58, 6, 6));
+                    tile.bounds[0] = Some(FloatRect::new(0., 58., 6., 6.));
                 }
                 else if (i, j) == (size_y + 1, size_x + 1) {
                     tile.sprite.set_texture(tex_man.get(TextureId::CornerBottomRight), true);
-                    tile.bounds[0] = Some(IntRect::new(0, 0, 6, 6));
+                    tile.bounds[0] = Some(FloatRect::new(0., 0., 6., 6.));
                 }
                 else if j == 0 {
                     tile.sprite.set_texture(tex_man.get(TextureId::WallLeft), true);
-                    tile.bounds[0] = Some(IntRect::new(58, 0, 6, 64));
+                    tile.bounds[0] = Some(FloatRect::new(58., 0., 6., 64.));
                 }
                 else if j == size_x + 1 {
                     tile.sprite.set_texture(tex_man.get(TextureId::WallRight), true);
-                    tile.bounds[0] = Some(IntRect::new(0, 0, 6, 64));
+                    tile.bounds[0] = Some(FloatRect::new(0., 0., 6., 64.));
                 }
                 else if i == 0 {
                     tile.sprite.set_texture(tex_man.get(TextureId::WallTop), true);
-                    tile.bounds[0] = Some(IntRect::new(0, 58, 64, 6));
+                    tile.bounds[0] = Some(FloatRect::new(0., 58., 64., 6.));
                 }
                 else if i == size_y + 1 {
                     tile.sprite.set_texture(tex_man.get(TextureId::WallBottom), true);
-                    tile.bounds[0] = Some(IntRect::new(0, 0, 64, 6));
+                    tile.bounds[0] = Some(FloatRect::new(0., 0., 64., 6.));
                 }
                 else {
                     tile.sprite.set_texture(tex_man.get(TextureId::Floor), true);
@@ -98,7 +99,7 @@ impl<'a> Wagon<'a> {
                 tiles[i as usize].push(tile);
             }
         }
-        
+
         Wagon {
             tiles: tiles,
             connected_to: [None, None]
@@ -128,13 +129,13 @@ impl<'a> Wagon<'a> {
         let other_height_half = other_height / 2;
 
         self.tiles[self_height_half - 1][0].sprite.set_texture(tex_man.get(TextureId::ConnectorTop), true);
-        self.tiles[self_height_half - 1][0].bounds[1] = Some(IntRect::new(0, 58, 64, 6));
+        self.tiles[self_height_half - 1][0].bounds[1] = Some(FloatRect::new(0., 58., 64., 6.));
 
         self.tiles[self_height_half][0].sprite.set_texture(tex_man.get(TextureId::Floor), true);
         self.tiles[self_height_half][0].is_solid = false;
 
         self.tiles[self_height_half + 1][0].sprite.set_texture(tex_man.get(TextureId::ConnectorBottom), true);
-        self.tiles[self_height_half + 1][0].bounds[1] = Some(IntRect::new(0, 0, 64, 6));
+        self.tiles[self_height_half + 1][0].bounds[1] = Some(FloatRect::new(0., 0., 64., 6.));
 
         other.tiles[other_height_half - 1][other_width -1].sprite.set_texture(tex_man.get(TextureId::WallConnectedTop), true);
         other.tiles[other_height_half][other_width -1] = { let mut tile = Tile::new(); tile.is_solid = true; tile };
@@ -148,25 +149,24 @@ impl<'a> Drawable for Wagon<'a> {
         for i in 0..(self.tiles.len()) {
             for j in 0..(self.tiles[i].len()) {
                 render_target.draw(&self.tiles[i][j].sprite);
-                if self.tiles[i][j].is_solid {
+                // if self.tiles[i][j].is_solid {
+                //     let bounds = self.tiles[i][j].bounds;
+                //     for b in bounds.iter() {
+                //         let b = if *b != None {
+                //             b.unwrap()
+                //         }
+                //         else {
+                //             continue;
+                //         };
+                //         let mut shape = RectangleShape::new().unwrap();
+                //         shape.set_fill_color(&Color::new_rgba(0, 0, 255, 100));
+                //         shape.set_size2f(b.width as f32, b.height as f32);
+                //         shape.set_position2f(self.tiles[i][j].sprite.get_position().x + b.left as f32,
+                //                              self.tiles[i][j].sprite.get_position().y + b.top as f32);
 
-                    let bounds = self.tiles[i][j].bounds;
-                    for b in bounds.iter() {
-                        let b = if *b != None {
-                            b.unwrap()
-                        }
-                        else {
-                            continue;
-                        };
-                        let mut shape = RectangleShape::new().unwrap();
-                        shape.set_fill_color(&Color::new_rgba(0, 0, 255, 100));
-                        shape.set_size2f(b.width as f32, b.height as f32);
-                        shape.set_position2f(self.tiles[i][j].sprite.get_position().x + b.left as f32,
-                                             self.tiles[i][j].sprite.get_position().y + b.top as f32);
-
-                        render_target.draw(&shape);
-                    }
-               }
+                //         render_target.draw(&shape);
+                //     }
+                // }
             }
         }
     }
@@ -191,7 +191,7 @@ impl<'a> Train<'a> {
             top_speed: 0.,
             accel: 0.,
             pfgrid_in: PathfindingGrid::new(),
-            pfgrid_out: PathfindingGrid::new()
+            pfgrid_out: PathfindingGrid::new(),
         }
     }
 
