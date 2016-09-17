@@ -279,10 +279,20 @@ impl Walkable for Vec<Vec<PathfindingTile>> {
     }
 }
 
-struct TrainSearch<'a> {
+pub struct TrainSearch<'a> {
     grid: &'a PathfindingGrid,
     start: (i32, i32),
     end: (i32, i32),
+}
+
+impl<'a> TrainSearch<'a> {
+    pub fn new(grid: &'a PathfindingGrid, start: (i32, i32), end: (i32, i32)) -> Self {
+        TrainSearch {
+            grid: grid,
+            start: start,
+            end: end
+        }
+    }
 }
 
 impl<'a> SearchProblem for TrainSearch<'a> {

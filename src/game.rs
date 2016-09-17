@@ -8,7 +8,7 @@ use sfml::audio::*;
 use state_stack::*;
 use resource_manager::*;
 use particle_manager::*;
-use actor::Actor;
+use actor::{Actor, Pathfinding};
 use menu::*;
 use wagon::*;
 use game_consts::*;
@@ -159,27 +159,14 @@ impl<'a> Game<'a> {
                                 }
                                 MouseButton::Right => {
                                     if let Some(selected_actor) = self.selected_actor {
-                                        let selected_actor_pos = (self.actors[selected_actor].shape.get_position().x as i32 / TILE_SIZE_X as i32,
-                                                                  self.actors[selected_actor].shape.get_position().y as i32 / TILE_SIZE_Y as i32);
-
                                         let click_pos = self.window.map_pixel_to_coords_current_view(&self.window.get_mouse_position());
-                                        let destination = (click_pos.x as i32 / TILE_SIZE_X as i32,
-                                                           click_pos.y as i32 / TILE_SIZE_Y as i32);
 
-                                        self.actors[selected_actor].move_seq.clear();
+                                        let mut actor = &mut self.actors[selected_actor];
 
-                                        let path_seq =
-                                            if self.actors[selected_actor].inside_wagon {
-                                                path(&self.train.pfgrid_in, selected_actor_pos, destination)
-                                            } else {
-                                                path(&self.train.pfgrid_out, selected_actor_pos, destination)
-                                            };
-
-                                        if let Some(path) = path_seq {
-                                            for step in path.iter() {
-                                                self.actors[selected_actor].move_seq.push_back(Vector2f::new(step.0 as f32 * TILE_SIZE_X as f32 + TILE_SIZE_X as f32 / 2.,
-                                                                                                             step.1 as f32 * TILE_SIZE_Y as f32 + TILE_SIZE_Y as f32 / 2.));
-                                            }
+                                        if actor.inside_wagon {
+                                            actor.set_path(&self.train.pfgrid_in, click_pos);
+                                        } else {
+                                            actor.set_path(&self.train.pfgrid_out, click_pos);
                                         }
                                     }
                                 }

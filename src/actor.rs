@@ -4,6 +4,8 @@ use sfml::system::*;
 use std::collections::VecDeque;
 
 use wagon::*;
+use game_consts::*;
+use astar::*;
 
 pub struct Actor<'a> {
     pub shape: RectangleShape<'a>,
@@ -108,7 +110,31 @@ impl<'a> Actor<'a> {
 }
 
 pub trait Pathfinding {
-    fn get_path(&self, ending_pos: &Vector2f) -> bool {
-        true
+    fn set_path(&mut self, grid: &PathfindingGrid, click_pos: Vector2f) -> bool;
+}
+
+impl<'a> Pathfinding for Actor<'a> {
+    fn set_path(&mut self, grid: &PathfindingGrid, click_pos: Vector2f) -> bool {
+        let start = (self.shape.get_position().x as i32 / TILE_SIZE_X as i32,
+                     self.shape.get_position().y as i32 / TILE_SIZE_Y as i32);
+
+        let end = (click_pos.x as i32 / TILE_SIZE_X as i32,
+                   click_pos.y as i32 / TILE_SIZE_Y as i32);
+
+        self.move_seq.clear();
+
+        let mut ts = TrainSearch::new(grid, start, end);
+
+        if let Some(path) = astar(&mut ts) {
+            for step in path.iter() {
+                self.move_seq.push_back(
+                    Vector2f::new(step.0 as f32 * TILE_SIZE_X as f32 + TILE_SIZE_X as f32 / 2.,
+                                  step.1 as f32 * TILE_SIZE_Y as f32 + TILE_SIZE_Y as f32 / 2.));
+            }
+            true
+        } else {
+            false
+        }
     }
 }
+
