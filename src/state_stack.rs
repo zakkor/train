@@ -2,19 +2,17 @@
 pub enum StateType {
     Playing,
     Menu,
-    GameOver
+    GameOver,
 }
 
 #[derive(Debug)]
 pub struct StateStack {
-    states: Vec<StateType>
+    states: Vec<StateType>,
 }
 
 impl StateStack {
     pub fn new() -> Self {
-        StateStack {
-            states: Vec::new()
-        }
+        StateStack { states: Vec::new() }
     }
     pub fn pop(&mut self) {
         self.states.pop();
@@ -25,7 +23,7 @@ impl StateStack {
     pub fn top(&self) -> Option<&StateType> {
         match self.states.len() {
             0 => None,
-            _ => Some(&self.states[self.states.len() - 1])
+            _ => Some(&self.states[self.states.len() - 1]),
         }
     }
 }

@@ -19,7 +19,7 @@ impl<'a> Actor<'a> {
         shape.set_size2f(25., 25.);
         shape.set_fill_color(&Color::red());
         shape.set_position2f(1280. / 2. - 100., 720. - 400.);
-        shape.set_origin2f(25./2., 25./2.);
+        shape.set_origin2f(25. / 2., 25. / 2.);
 
         Actor {
             shape: shape,
@@ -63,11 +63,10 @@ impl<'a> Actor<'a> {
         let current_pos = self.shape.get_position();
 
         let dest = self.move_seq.front().unwrap().clone();
-        if (dest.x - current_pos.x).abs() < 1.
-            && (dest.y - current_pos.y).abs() < 1. {
-                self.move_seq.pop_front();
-                return;
-            }
+        if (dest.x - current_pos.x).abs() < 1. && (dest.y - current_pos.y).abs() < 1. {
+            self.move_seq.pop_front();
+            return;
+        }
 
         let mut move_dir = Vector2f::new(dest.x - current_pos.x, dest.y - current_pos.y);
         let vec_len = (move_dir.x.powi(2) + move_dir.y.powi(2)).sqrt().abs();
@@ -97,10 +96,10 @@ impl<'a> Actor<'a> {
                     for t in w.tiles.iter() {
                         for t in t.iter() {
                             if !t.is_solid &&
-                                t.sprite.get_global_bounds().contains(self.shape.get_position()) {
-                                    self.inside_wagon = true;
-                                    break;
-                                }
+                               t.sprite.get_global_bounds().contains(self.shape.get_position()) {
+                                self.inside_wagon = true;
+                                break;
+                            }
                         }
                     }
                 }
@@ -127,9 +126,10 @@ impl<'a> Pathfinding for Actor<'a> {
 
         if let Some(path) = astar(&mut ts) {
             for step in path.iter() {
-                self.move_seq.push_back(
-                    Vector2f::new(step.0 as f32 * TILE_SIZE_X as f32 + TILE_SIZE_X as f32 / 2.,
-                                  step.1 as f32 * TILE_SIZE_Y as f32 + TILE_SIZE_Y as f32 / 2.));
+                self.move_seq.push_back(Vector2f::new(step.0 as f32 * TILE_SIZE_X as f32 +
+                                                      TILE_SIZE_X as f32 / 2.,
+                                                      step.1 as f32 * TILE_SIZE_Y as f32 +
+                                                      TILE_SIZE_Y as f32 / 2.));
             }
             true
         } else {
@@ -137,4 +137,3 @@ impl<'a> Pathfinding for Actor<'a> {
         }
     }
 }
-

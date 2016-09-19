@@ -37,7 +37,8 @@ impl<'a> Game<'a> {
         let mut window = RenderWindow::new(VideoMode::new_init(WINDOW_SIZE_X, WINDOW_SIZE_Y, 32),
                                            "Train",
                                            window_style::CLOSE,
-                                           &ContextSettings::default()).unwrap();
+                                           &ContextSettings::default())
+            .unwrap();
 
         window.set_framerate_limit(60);
         window.set_vertical_sync_enabled(true);
@@ -60,9 +61,12 @@ impl<'a> Game<'a> {
             actors: vec![],
             selected_actor: None,
             menu: Menu { buttons: vec![] },
-            world: World { bgs: vec![], rails: vec![] },
+            world: World {
+                bgs: vec![],
+                rails: vec![],
+            },
             camera: Camera::new(),
-            tile_selection: tile_selection
+            tile_selection: tile_selection,
         }
     }
 
@@ -93,14 +97,14 @@ impl<'a> Game<'a> {
 
         self.train.init(700., 0.8); // top speed, accel
 
-        /*<test>*/
+        // <test>
         self.train.wagons.push(Wagon::new(&self.resources.tm, 4, 5));
         self.train.wagons.push(Wagon::new(&self.resources.tm, 3, 5));
-//        self.train.wagons.push(Wagon::new(&self.resources.tm, 3, 3));
+        //        self.train.wagons.push(Wagon::new(&self.resources.tm, 3, 3));
 
         self.train.wagons[0].set_position2f(64. * 4., 0.);
         self.train.wagons[1].tiles[6][2] = Tile::new();
-        //         /*</test>*/
+        // </test>
 
         {
             let (a, b) = self.train.wagons.split_at_mut(1);
@@ -115,7 +119,7 @@ impl<'a> Game<'a> {
 
         self.actors = vec![Actor::new(), Actor::new(), Actor::new(), Actor::new()];
 
-//        self.train.screech_snd = Some(self.music_manager.get_mut(MusicId::Screech));
+        //        self.train.screech_snd = Some(self.music_manager.get_mut(MusicId::Screech));
     }
 
     fn process_events(&mut self) {
@@ -124,16 +128,19 @@ impl<'a> Game<'a> {
                 StateType::Playing => {
                     // Camera movement
                     if MouseButton::Middle.is_pressed() {
-                        self.camera.move_by_mouse(&self.window.map_pixel_to_coords_current_view(&self.window.get_mouse_position()));
+                        self.camera.move_by_mouse(&self.window
+                            .map_pixel_to_coords_current_view(&self.window.get_mouse_position()));
 
                         self.window.set_view(&self.camera.view);
                     }
-                    self.camera.mouse_pos_old = self.window.map_pixel_to_coords_current_view(&self.window.get_mouse_position());
+                    self.camera.mouse_pos_old = self.window
+                        .map_pixel_to_coords_current_view(&self.window.get_mouse_position());
 
                     match event {
                         event::Closed => self.window.close(),
-                        event::MouseMoved { x, y, ..} => {
-                            let coords = self.window.map_pixel_to_coords_current_view(&Vector2i::new(x, y));
+                        event::MouseMoved { x, y, .. } => {
+                            let coords = self.window
+                                .map_pixel_to_coords_current_view(&Vector2i::new(x, y));
                             if let Some(_) = self.selected_actor {
                                 self.tile_selection.set_position2f(((TILE_SIZE_X as u32) * (coords.x as u32 / TILE_SIZE_X)) as f32,
                                                                    ((TILE_SIZE_Y as u32) * (coords.y as u32 / TILE_SIZE_Y)) as f32);
@@ -145,8 +152,12 @@ impl<'a> Game<'a> {
                                     // select actor under cursor
                                     let mut actor_to_unselect: Option<usize> = None;
                                     for (i, a) in self.actors.iter_mut().enumerate() {
-                                        let coords = self.window.map_pixel_to_coords_current_view(&self.window.get_mouse_position());
-                                        if a.shape.get_global_bounds().contains(coords.to_vector2f()) {
+                                        let coords = self.window
+                                            .map_pixel_to_coords_current_view(&self.window
+                                                .get_mouse_position());
+                                        if a.shape
+                                            .get_global_bounds()
+                                            .contains(coords.to_vector2f()) {
                                             actor_to_unselect = self.selected_actor;
                                             a.shape.set_fill_color(&Color::green());
                                             self.selected_actor = Some(i);
@@ -159,7 +170,9 @@ impl<'a> Game<'a> {
                                 }
                                 MouseButton::Right => {
                                     if let Some(selected_actor) = self.selected_actor {
-                                        let click_pos = self.window.map_pixel_to_coords_current_view(&self.window.get_mouse_position());
+                                        let click_pos = self.window
+                                            .map_pixel_to_coords_current_view(&self.window
+                                                .get_mouse_position());
 
                                         let mut actor = &mut self.actors[selected_actor];
 
@@ -228,18 +241,18 @@ impl<'a> Game<'a> {
                                 let x = x as f32;
                                 let y = y as f32;
                                 if x > button.text.get_position().x &&
-                                    x <
-                                    (button.text.get_position().x +
-                                     button.text.get_local_bounds().width) &&
-                                    y > button.text.get_position().y &&
-                                    y <
-                                    (button.text.get_position().y +
-                                     button.text.get_local_bounds().height * 2.) {
-                                        // <- *2. because Text bounding box is broken - SFML bug?
-                                        button.text.set_color(&Color::green());
-                                    } else {
-                                        button.text.set_color(&Color::white());
-                                    }
+                                   x <
+                                   (button.text.get_position().x +
+                                    button.text.get_local_bounds().width) &&
+                                   y > button.text.get_position().y &&
+                                   y <
+                                   (button.text.get_position().y +
+                                    button.text.get_local_bounds().height * 2.) {
+                                    // <- *2. because Text bounding box is broken - SFML bug?
+                                    button.text.set_color(&Color::green());
+                                } else {
+                                    button.text.set_color(&Color::white());
+                                }
                             }
                         }
                         event::MouseButtonReleased { button, .. } => {
@@ -248,7 +261,8 @@ impl<'a> Game<'a> {
                                     for button in &self.menu.buttons {
                                         // check if the button is literally green
                                         // TODO: change this to something better
-                                        if button.text.get_color().0 == Color::new_rgb(0, 255, 0).0 {
+                                        if button.text.get_color().0 ==
+                                           Color::new_rgb(0, 255, 0).0 {
                                             match button.button_type {
                                                 ButtonType::Quit => {
                                                     self.window.close();
@@ -267,22 +281,22 @@ impl<'a> Game<'a> {
                     }
                 }
                 StateType::GameOver => {
-                //     match event {
-                //         event::Closed => {
-                //             window.close();
-                //         }
-                //         event::KeyReleased { code, .. } => {
-                //             match code {
-                //                 Key::R => {
-                //                     // reset the game
-                //                     state_stack.pop();
+                    //     match event {
+                    //         event::Closed => {
+                    //             window.close();
+                    //         }
+                    //         event::KeyReleased { code, .. } => {
+                    //             match code {
+                    //                 Key::R => {
+                    //                     // reset the game
+                    //                     state_stack.pop();
 
-                //                 }
-                //                 _ => {}
-                //             }
-                //         }
-                //         _ => {}
-                //     }
+                    //                 }
+                    //                 _ => {}
+                    //             }
+                    //         }
+                    //         _ => {}
+                    //     }
                 }
             }
         }
@@ -351,9 +365,11 @@ impl<'a> Game<'a> {
                 }
 
                 if let Some(selected_actor) = self.selected_actor {
-                    for (i, t) in
-                        if self.actors[selected_actor].inside_wagon { self.train.pfgrid_in.grid.iter().enumerate() }
-                    else { self.train.pfgrid_out.grid.iter().enumerate() } {
+                    for (i, t) in if self.actors[selected_actor].inside_wagon {
+                        self.train.pfgrid_in.grid.iter().enumerate()
+                    } else {
+                        self.train.pfgrid_out.grid.iter().enumerate()
+                    } {
                         for (j, t) in t.iter().enumerate() {
                             let mut shape = RectangleShape::new().unwrap();
                             shape.set_size2f(64., 64.);
@@ -371,7 +387,7 @@ impl<'a> Game<'a> {
                 }
 
                 self.window.draw(&self.tile_selection);
-            },
+            }
             StateType::Menu => {
                 self.window.clear(&Color::black());
 

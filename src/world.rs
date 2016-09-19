@@ -13,7 +13,7 @@ impl<'a> World<'a> {
         let bg1 = Sprite::new_with_texture(&tm.get(TextureId::Background)).unwrap();
 
         let mut bg2 = bg1.clone();
-        bg2.set_position2f( -(WINDOW_SIZE_X as f32), 0.);
+        bg2.set_position2f(-(WINDOW_SIZE_X as f32), 0.);
 
         self.bgs.push(bg1);
         self.bgs.push(bg2);

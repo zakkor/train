@@ -26,7 +26,7 @@ impl Camera {
     pub fn zoom(&mut self, delta: i32) {
         let zoom_factor = match delta < 0 {
             true => 1.0 + self.zoom_step,
-            false => 1.0 - self.zoom_step
+            false => 1.0 - self.zoom_step,
         };
 
         self.view.zoom(zoom_factor);

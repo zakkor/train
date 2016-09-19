@@ -8,7 +8,7 @@ use sfml::system::*;
 pub struct Particle<'a> {
     pub shape: RectangleShape<'a>,
     pub direction: Vector2f,
-    pub mark_for_explosion: bool
+    pub mark_for_explosion: bool,
 }
 
 impl<'a> Particle<'a> {
@@ -16,7 +16,7 @@ impl<'a> Particle<'a> {
         Particle {
             shape: shape,
             direction: direction,
-            mark_for_explosion: false
+            mark_for_explosion: false,
         }
     }
 }
@@ -25,8 +25,7 @@ pub struct ParticleManager<'a> {
     pub particles: Vec<Particle<'a>>,
     position: Vector2f,
     pub clock: Clock,
-    cleanup: Vec<usize>
-
+    cleanup: Vec<usize>,
 }
 
 impl<'a> ParticleManager<'a> {
@@ -35,27 +34,22 @@ impl<'a> ParticleManager<'a> {
             particles: vec![],
             position: Vector2f::new(0., 0.),
             clock: Clock::new(),
-            cleanup: vec![]
+            cleanup: vec![],
         }
     }
 
-    pub fn update(&mut self,
-                  dt: f32,
-                  downwards_speed: f32) {
+    pub fn update(&mut self, dt: f32, downwards_speed: f32) {
         for (i, p) in self.particles.iter_mut().enumerate() {
             if p.shape.get_scale().x <= 0.05 {
                 self.cleanup.push(i);
-            }
-            else if p.mark_for_explosion {
+            } else if p.mark_for_explosion {
                 if p.shape.get_scale().x >= 1.1 {
                     self.cleanup.push(i);
-                }
-                else {
+                } else {
                     p.shape.move2f(0., downwards_speed);
                     p.shape.scale2f(1.1, 1.1);
                 }
-            }
-            else {
+            } else {
                 p.shape.move2f(p.direction.x * dt, p.direction.y * dt);
                 p.shape.rotate(90. * dt);
                 p.shape.scale2f(0.95, 0.95);
@@ -83,7 +77,8 @@ impl<'a> ParticleManager<'a> {
 
     pub fn spawn_random_particle(&mut self, color: &Color) {
         let shape = ParticleManager::create_particle_shape(&self.position, color);
-        let direction = Vector2f::new(rand::thread_rng().gen_range(-400, 400) as f32, rand::thread_rng().gen_range(-500, -200) as f32);
+        let direction = Vector2f::new(rand::thread_rng().gen_range(-400, 400) as f32,
+                                      rand::thread_rng().gen_range(-500, -200) as f32);
         self.particles.push(Particle::new(shape, direction));
     }
 

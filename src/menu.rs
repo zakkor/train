@@ -23,15 +23,15 @@ impl<'a> Button<'a> {
         match button_type {
             ButtonType::Quit => {
                 text.set_string("QUIT");
-            },
+            }
             ButtonType::Resume => {
                 text.set_string("RESUME");
-            },
+            }
         }
 
-//        let text_size = text.get_global_bounds();
+        //        let text_size = text.get_global_bounds();
 
-//        println!("{:?}", text_size);
+        //        println!("{:?}", text_size);
 
         text.set_position(pos);
 
@@ -43,7 +43,5 @@ impl<'a> Button<'a> {
 }
 
 pub struct Menu<'a> {
-    pub buttons: Vec<Button<'a>>
+    pub buttons: Vec<Button<'a>>,
 }
-
-

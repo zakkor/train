@@ -2,7 +2,7 @@ use std::collections::HashMap;
 use std::hash::Hash;
 extern crate sfml;
 use sfml::graphics::{Texture, Font};
-use sfml::audio::{Music};
+use sfml::audio::{Music, SoundBuffer};
 
 pub trait Resource: Sized {
     fn new_from_file(filename: &str) -> Option<Self>;
@@ -26,15 +26,19 @@ impl Resource for Music {
     }
 }
 
+impl Resource for SoundBuffer {
+    fn new_from_file(filename: &str) -> Option<Self> {
+        SoundBuffer::new(filename)
+    }
+}
+
 pub struct ResourceManager<I, R> {
-    resource_map: HashMap<I, R>
+    resource_map: HashMap<I, R>,
 }
 
 impl<I: Eq + Hash, R: Resource> ResourceManager<I, R> {
     pub fn new() -> Self {
-        ResourceManager {
-            resource_map: HashMap::<I, R>::new()
-        }
+        ResourceManager { resource_map: HashMap::<I, R>::new() }
     }
 
     pub fn load(&mut self, identifier: I, filename: &str) {
@@ -79,7 +83,7 @@ pub enum TextureId {
 #[derive(PartialEq, Eq, Hash)]
 pub enum FontId {
     Arial,
-    Joystix
+    Joystix,
 }
 
 #[derive(PartialEq, Eq, Hash)]
@@ -88,13 +92,20 @@ pub enum MusicId {
     Screech,
 }
 
+#[derive(PartialEq, Eq, Hash)]
+pub enum SoundId {
+
+}
+
 pub type TextureManager = ResourceManager<TextureId, Texture>;
 pub type FontManager = ResourceManager<FontId, Font>;
 pub type MusicManager = ResourceManager<MusicId, Music>;
+pub type SoundManager = ResourceManager<SoundId, SoundBuffer>;
 
 pub struct Resources {
     pub fm: FontManager,
     pub tm: TextureManager,
+    pub sm: SoundManager,
 }
 
 impl Resources {
@@ -116,12 +127,17 @@ impl Resources {
         tm.load(TextureId::ConnectorTop, "res/connector_top.png");
         tm.load(TextureId::ConnectorBottom, "res/connector_bottom.png");
         tm.load(TextureId::WallConnectedTop, "res/wall_connected_top.png");
-        tm.load(TextureId::WallConnectedBottom, "res/wall_connected_bottom.png");
+        tm.load(TextureId::WallConnectedBottom,
+                "res/wall_connected_bottom.png");
         tm.load(TextureId::Background, "res/bg.png");
+
+        let mut sm = SoundManager::new();
+//        sm.
 
         Resources {
             fm: fm,
             tm: tm,
+            sm: sm,
         }
     }
 }
