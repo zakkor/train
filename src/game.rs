@@ -98,26 +98,27 @@ impl<'a> Game<'a> {
         self.train.init(700., 0.8); // top speed, accel
 
         // <test>
+        self.train.wagons.push(Wagon::new(&self.resources.tm, 2, 3));
         self.train.wagons.push(Wagon::new(&self.resources.tm, 4, 5));
-        self.train.wagons.push(Wagon::new(&self.resources.tm, 3, 5));
-        //        self.train.wagons.push(Wagon::new(&self.resources.tm, 3, 3));
+        self.train.wagons.push(Wagon::new(&self.resources.tm, 6, 7));
 
-        self.train.wagons[0].set_position2f(64. * 4., 0.);
-        self.train.wagons[1].tiles[6][2] = Tile::new();
+        self.train.wagons[0].set_position2f(TILE_SIZE_X as f32 * 12., TILE_SIZE_Y as f32 * 4.);
+//        self.train.wagons[1].tiles[6][2] = Tile::new();
         // </test>
 
         {
             let (a, b) = self.train.wagons.split_at_mut(1);
             a[0].connect(&mut b[0], &self.resources.tm);
         }
-        // {
-        //     let (a, b) = self.train.wagons.split_at_mut(2);
-        //     a[1].connect(&mut b[0], &self.resources.tm);
-        // }
+        {
+            let (a, b) = self.train.wagons.split_at_mut(2);
+            a[1].connect(&mut b[0], &self.resources.tm);
+        }
 
         self.train.rebuild_pfgrids();
 
         self.actors = vec![Actor::new(), Actor::new(), Actor::new(), Actor::new()];
+
 
         //        self.train.screech_snd = Some(self.music_manager.get_mut(MusicId::Screech));
     }
@@ -170,17 +171,26 @@ impl<'a> Game<'a> {
                                 }
                                 MouseButton::Right => {
                                     if let Some(selected_actor) = self.selected_actor {
+                                        println!("{:?}", self.train.total_size);
                                         let click_pos = self.window
                                             .map_pixel_to_coords_current_view(&self.window
                                                 .get_mouse_position());
 
                                         let mut actor = &mut self.actors[selected_actor];
 
-                                        if actor.inside_wagon {
-                                            actor.set_path(&self.train.pfgrid_in, click_pos);
+                                        let pfgrid_to_use = if actor.inside_wagon {
+                                            &self.train.pfgrid_in
                                         } else {
-                                            actor.set_path(&self.train.pfgrid_out, click_pos);
-                                        }
+                                            &self.train.pfgrid_out
+                                        };
+
+                                        let first_wagon_height = self.train.wagons.last().unwrap().tiles.len();
+                                        let first_tile_pos = self.train.wagons.last().unwrap().tiles[0][0].sprite.get_position();
+                                        let train_pos = Vector2f::new(first_tile_pos.x,
+                                                                      first_tile_pos.y - ((self.train.total_size.y as f32 - first_wagon_height as f32) / 2.) * TILE_SIZE_Y as f32);
+                                        actor.set_path(pfgrid_to_use,
+                                                       &train_pos,
+                                                       click_pos);
                                     }
                                 }
                                 _ => {}
@@ -189,6 +199,7 @@ impl<'a> Game<'a> {
                         event::MouseWheelMoved { delta, .. } => {
                             self.camera.zoom(delta);
                             self.window.set_view(&self.camera.view);
+//                            self.world.recalculate_drawables(&self.camera.view, &self.window.map_pixel_to_coords_current_view(&Vector2i::new(0, 0)), &self.resources.tm);
                         }
                         event::KeyReleased { code, .. } => {
                             if let Key::Escape = code {
@@ -311,17 +322,9 @@ impl<'a> Game<'a> {
                     a.update_movement(&self.train.wagons, dt);
                 }
 
-                self.world.update();
+                self.world.update(dt * -self.train.current_speed);
 
                 self.train.update();
-
-                for bg in self.world.bgs.iter_mut() {
-                    bg.move2f(dt * -self.train.current_speed, 0.);
-                }
-
-                for rail in self.world.rails.iter_mut() {
-                    rail.move2f(dt * -self.train.current_speed, 0.);
-                }
 
                 for a in self.actors.iter_mut() {
                     if !a.inside_wagon {
@@ -371,9 +374,15 @@ impl<'a> Game<'a> {
                         self.train.pfgrid_out.grid.iter().enumerate()
                     } {
                         for (j, t) in t.iter().enumerate() {
+                            let first_wagon_height = self.train.wagons.last().unwrap().tiles.len();
+                            let first_tile_pos = self.train.wagons.last().unwrap().tiles[0][0].sprite.get_position();
+                            let train_pos = Vector2f::new(first_tile_pos.x,
+                                                          first_tile_pos.y - ((self.train.total_size.y as f32 - first_wagon_height as f32) / 2.) * TILE_SIZE_Y as f32);
+
                             let mut shape = RectangleShape::new().unwrap();
                             shape.set_size2f(64., 64.);
-                            shape.set_position2f(i as f32 * 64., j as f32 * 64.);
+                            shape.set_position2f(i as f32 * 64. + train_pos.x,
+                                                 j as f32 * 64. + train_pos.y);
 
                             if t.walkable {
                                 shape.set_fill_color(&Color::new_rgba(0, 255, 0, 120));

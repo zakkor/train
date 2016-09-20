@@ -18,7 +18,7 @@ impl<'a> Actor<'a> {
         let mut shape = RectangleShape::new().unwrap();
         shape.set_size2f(25., 25.);
         shape.set_fill_color(&Color::red());
-        shape.set_position2f(1280. / 2. - 100., 720. - 400.);
+        shape.set_position2f(1280. / 2. - 100., 500.);
         shape.set_origin2f(25. / 2., 25. / 2.);
 
         Actor {
@@ -109,16 +109,16 @@ impl<'a> Actor<'a> {
 }
 
 pub trait Pathfinding {
-    fn set_path(&mut self, grid: &PathfindingGrid, click_pos: Vector2f) -> bool;
+    fn set_path(&mut self, grid: &PathfindingGrid, train_pos: &Vector2f, click_pos: Vector2f) -> bool;
 }
 
 impl<'a> Pathfinding for Actor<'a> {
-    fn set_path(&mut self, grid: &PathfindingGrid, click_pos: Vector2f) -> bool {
-        let start = (self.shape.get_position().x as i32 / TILE_SIZE_X as i32,
-                     self.shape.get_position().y as i32 / TILE_SIZE_Y as i32);
+    fn set_path(&mut self, grid: &PathfindingGrid, train_pos: &Vector2f, click_pos: Vector2f) -> bool {
+        let start = (self.shape.get_position().x as i32 / TILE_SIZE_X as i32 - train_pos.x as i32 / TILE_SIZE_X as i32,
+                     self.shape.get_position().y as i32 / TILE_SIZE_Y as i32 - train_pos.y as i32 / TILE_SIZE_Y as i32);
 
-        let end = (click_pos.x as i32 / TILE_SIZE_X as i32,
-                   click_pos.y as i32 / TILE_SIZE_Y as i32);
+        let end = (click_pos.x as i32 / TILE_SIZE_X as i32 - train_pos.x as i32 / TILE_SIZE_X as i32,
+                   click_pos.y as i32 / TILE_SIZE_Y as i32 - train_pos.y as i32 / TILE_SIZE_Y as i32);
 
         self.move_seq.clear();
 
@@ -126,9 +126,9 @@ impl<'a> Pathfinding for Actor<'a> {
 
         if let Some(path) = astar(&mut ts) {
             for step in path.iter() {
-                self.move_seq.push_back(Vector2f::new(step.0 as f32 * TILE_SIZE_X as f32 +
+                self.move_seq.push_back(Vector2f::new((step.0 as f32 + train_pos.x / TILE_SIZE_X as f32) * TILE_SIZE_X as f32 +
                                                       TILE_SIZE_X as f32 / 2.,
-                                                      step.1 as f32 * TILE_SIZE_Y as f32 +
+                                                      (step.1 as f32 + train_pos.y / TILE_SIZE_Y as f32) * TILE_SIZE_Y as f32 +
                                                       TILE_SIZE_Y as f32 / 2.));
             }
             true
