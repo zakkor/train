@@ -20,25 +20,28 @@ impl<'a> World<'a> {
             }
         }
 
-        let spacing = 44.; // magic
+        let spacing = 40.; // magic
 
-        for x in 0..40 {
+        for x in 0..80 {
             let mut new_rail = RectangleShape::new().unwrap();
             new_rail.set_fill_color(&Color::new_rgb(153, 76, 0));
-            new_rail.set_position2f(x as f32 * spacing, 2. * 64.);
+            new_rail.set_position2f(x as f32 * spacing, 5. * 64.);
             new_rail.set_size2f(20., 3. * 64.); // magic
             self.rails.push(new_rail);
         }
 
-        // 2 metal bars for the actual rails
-        let mut new_bar = RectangleShape::new().unwrap();
-        new_bar.set_fill_color(&Color::new_rgb(192, 192, 192));
-        new_bar.set_position2f(0., 2.25 * 64.);
-        new_bar.set_size2f(1600. * 2., 20.); // magic
-        let mut new_bar2 = new_bar.clone();
-        new_bar2.set_position2f(0., 4.40 * 64.);
-        self.rails.push(new_bar);
-        self.rails.push(new_bar2);
+        // 4 metal bars for the actual rails
+        for x in 0..2 {
+            let mut new_bar = RectangleShape::new().unwrap();
+            new_bar.set_fill_color(&Color::new_rgb(192, 192, 192));
+            new_bar.set_position2f((WINDOW_SIZE_X * x) as f32, 5.25 * 64.);
+            new_bar.set_size2f(WINDOW_SIZE_X as f32, 20.); // magic
+            let mut new_bar2 = new_bar.clone();
+            new_bar2.set_position2f((WINDOW_SIZE_X * x) as f32, 7.40 * 64.);
+            self.rails.push(new_bar);
+            self.rails.push(new_bar2);
+        }
+
     }
 
     pub fn update(&mut self, speed: f32) {
@@ -58,9 +61,9 @@ impl<'a> World<'a> {
             bg.move2f(speed, 0.);
         }
 
-        // for rail in self.rails.iter_mut() {
-        //     rail.move2f(speed, 0.);
-        // }
+        for rail in self.rails.iter_mut() {
+            rail.move2f(speed, 0.);
+        }
     }
 
     // pub fn recalculate_drawables(&mut self, view: &View, origin_pixels: &Vector2f, tm: &'a TextureManager) {

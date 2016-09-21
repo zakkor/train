@@ -98,11 +98,11 @@ impl<'a> Game<'a> {
         self.train.init(700., 0.8); // top speed, accel
 
         // <test>
-        self.train.wagons.push(Wagon::new(&self.resources.tm, 2, 3));
+        self.train.wagons.push(Wagon::new(&self.resources.tm, 2, 7));
         self.train.wagons.push(Wagon::new(&self.resources.tm, 4, 5));
         self.train.wagons.push(Wagon::new(&self.resources.tm, 6, 7));
 
-        self.train.wagons[0].set_position2f(TILE_SIZE_X as f32 * 12., TILE_SIZE_Y as f32 * 4.);
+        self.train.wagons[0].set_position2f(TILE_SIZE_X as f32 * 12., TILE_SIZE_Y as f32 * 2.);
 //        self.train.wagons[1].tiles[6][2] = Tile::new();
         // </test>
 
