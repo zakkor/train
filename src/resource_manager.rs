@@ -137,8 +137,14 @@ impl Resources {
         tm.load(TextureId::Background, "res/bg.png");
         tm.load(TextureId::Actor, "res/actor.png");
         tm.load(TextureId::Enemy, "res/enemy.png");
+        tm.load(TextureId::DoorOpen(Direction::North), "res/door_north.png");
         tm.load(TextureId::DoorOpen(Direction::South), "res/door_south.png");
+        tm.load(TextureId::DoorOpen(Direction::West), "res/door_west.png");
+        tm.load(TextureId::DoorOpen(Direction::East), "res/door_east.png");
+        tm.load(TextureId::DoorClosed(Direction::North), "res/door_closed_north.png");
         tm.load(TextureId::DoorClosed(Direction::South), "res/door_closed_south.png");
+        tm.load(TextureId::DoorClosed(Direction::West), "res/door_closed_west.png");
+        tm.load(TextureId::DoorClosed(Direction::East), "res/door_closed_east.png");
 
         let mut sm = SoundManager::new();
 //        sm.

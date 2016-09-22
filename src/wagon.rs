@@ -94,13 +94,15 @@ impl<'a> Wagon<'a> {
                 } else if j == size_x + 1 {
                     tile.sprite.set_texture(tex_man.get(TextureId::WallRight), true);
                     tile.bounds[0] = Some(FloatRect::new(0., 0., 6., 64.));
+                } else if i == 0 && j == size_y / 2 {
+                    tile.tile_type = TileType::Door(Direction::North);
+                    tile.sprite.set_texture(tex_man.get(TextureId::DoorClosed(Direction::North)), true);
                 } else if i == 0 {
                     tile.sprite.set_texture(tex_man.get(TextureId::WallTop), true);
                     tile.bounds[0] = Some(FloatRect::new(0., 58., 64., 6.));
                 } else if i == size_y + 1 && j == size_y / 2 {
                     tile.tile_type = TileType::Door(Direction::South);
                     tile.sprite.set_texture(tex_man.get(TextureId::DoorClosed(Direction::South)), true);
-//                    tile.is_solid = true;
                 } else if i == size_y + 1 {
                     tile.sprite.set_texture(tex_man.get(TextureId::WallBottom), true);
                     tile.bounds[0] = Some(FloatRect::new(0., 0., 64., 6.));
