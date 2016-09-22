@@ -81,6 +81,7 @@ pub enum TextureId {
     Background,
     Actor,
     Enemy,
+    DoorSouth,
 }
 #[derive(PartialEq, Eq, Hash)]
 pub enum FontId {
@@ -134,6 +135,7 @@ impl Resources {
         tm.load(TextureId::Background, "res/bg.png");
         tm.load(TextureId::Actor, "res/actor.png");
         tm.load(TextureId::Enemy, "res/enemy.png");
+        tm.load(TextureId::DoorSouth, "res/door_south.png");
 
         let mut sm = SoundManager::new();
 //        sm.

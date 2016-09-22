@@ -3,7 +3,7 @@ use game_consts::*;
 use astar::*;
 use std::vec::IntoIter;
 use sfml::graphics::{FloatRect, Transformable};
-use wagon::Wagon;
+use wagon::{Wagon, TileType};
 use std::collections::VecDeque;
 
 #[derive(Copy, Clone)]
@@ -14,11 +14,15 @@ pub struct PathfindingTile {
 #[derive(Clone)]
 pub struct PathfindingGrid {
     pub grid: Vec<Vec<PathfindingTile>>,
+    pub padding: (usize, usize, usize, usize),
 }
 
 impl PathfindingGrid {
     pub fn new() -> Self {
-        PathfindingGrid { grid: vec![] }
+        PathfindingGrid {
+            grid: vec![],
+            padding: (0, 0, 0, 0),
+        }
     }
 }
 
@@ -69,13 +73,13 @@ impl<'a> SearchProblem for GridSearch<'a> {
                 if !(i == 0 && k == 0)
                     // fucking corners
                     && !(i == -1 && k == -1) && !(i == -1 && k == 1) &&
-                   !(i == 1 && k == -1) &&
-                   !(i == 1 && k == 1) && x + i >= 0 && y + k >= 0 &&
-                   x + i < self.grid.grid.len() as i32 &&
-                   y + k < self.grid.grid[0].len() as i32 &&
-                   self.grid.grid.is_walkable(x + i, y + k) {
-                    vec.push(((x + i, y + k), 1));
-                }
+                    !(i == 1 && k == -1) &&
+                    !(i == 1 && k == 1) && x + i >= 0 && y + k >= 0 &&
+                    x + i < self.grid.grid.len() as i32 &&
+                    y + k < self.grid.grid[0].len() as i32 &&
+                    self.grid.grid.is_walkable(x + i, y + k) {
+                        vec.push(((x + i, y + k), 1));
+                    }
             }
         }
         vec.into_iter()
@@ -94,21 +98,26 @@ pub trait Pathfinding {
     fn set_inside_wagon(&mut self, inside: bool);
 
     fn set_path(&mut self, grid: &PathfindingGrid, train_pos: &Vector2f, click_pos: Vector2f) -> bool {
-        let start = (self.get_pos().x as i32 / TILE_SIZE_X as i32 - train_pos.x as i32 / TILE_SIZE_X as i32,
-                     self.get_pos().y as i32 / TILE_SIZE_Y as i32 - train_pos.y as i32 / TILE_SIZE_Y as i32);
+        let start = (self.get_pos().x as i32 / TILE_SIZE_X as i32
+                     - (train_pos.x - grid.padding.2 as f32 * TILE_SIZE_X as f32) as i32 / TILE_SIZE_X as i32,
 
-        let end = (click_pos.x as i32 / TILE_SIZE_X as i32 - train_pos.x as i32 / TILE_SIZE_X as i32,
-                   click_pos.y as i32 / TILE_SIZE_Y as i32 - train_pos.y as i32 / TILE_SIZE_Y as i32);
+                     self.get_pos().y as i32 / TILE_SIZE_Y as i32
+                     - (train_pos.y - grid.padding.0 as f32 * TILE_SIZE_X as f32) as i32 / TILE_SIZE_Y as i32);
+
+        let end = (click_pos.x as i32 / TILE_SIZE_X as i32 - (train_pos.x - 2. * 64.) as i32 / TILE_SIZE_X as i32,
+                   click_pos.y as i32 / TILE_SIZE_Y as i32 - (train_pos.y - 2. * 64.) as i32 / TILE_SIZE_Y as i32);
 
         self.clear_steps();
 
         let mut ts = GridSearch::new(grid, start, end);
 
         if let Some(path) = astar(&mut ts) {
-            for step in path.iter() {
-                self.add_step(Vector2f::new((step.0 as f32 + train_pos.x / TILE_SIZE_X as f32) * TILE_SIZE_X as f32 +
+            let mut path = path.iter();
+            path.next();
+            for step in path {
+                self.add_step(Vector2f::new((step.0 as f32 + (train_pos.y - 2. * 64.) / TILE_SIZE_X as f32) * TILE_SIZE_X as f32 +
                                             TILE_SIZE_X as f32 / 2.,
-                                            (step.1 as f32 + train_pos.y / TILE_SIZE_Y as f32) * TILE_SIZE_Y as f32 +
+                                            (step.1 as f32 + (train_pos.y - 2. * 64.) / TILE_SIZE_Y as f32) * TILE_SIZE_Y as f32 +
                                             TILE_SIZE_Y as f32 / 2.));
             }
             true
@@ -186,8 +195,12 @@ pub trait Pathfinding {
                         for t in t.iter() {
                             if !t.is_solid &&
                                 t.sprite.get_global_bounds().contains(self.get_pos()) {
-                                    self.set_inside_wagon(true);
-                                    break;
+                                    if let TileType::Door(_) = t.tile_type {
+                                        continue;
+                                    } else {
+                                        self.set_inside_wagon(true);
+                                        break;
+                                    }
                                 }
                         }
                     }

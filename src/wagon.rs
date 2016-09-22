@@ -13,28 +13,43 @@ use std::vec::IntoIter;
 use std::collections::VecDeque;
 use pathfinding::{PathfindingGrid, PathfindingTile};
 
+#[derive(Clone, PartialEq)]
+pub enum Direction {
+    North,
+    South,
+    West,
+    East
+}
+
+#[derive(Clone, PartialEq)]
+pub enum TileType {
+    WallAndFloor,
+    Door(Direction),
+    Window(Direction),
+}
+
 #[derive(Clone)]
 pub struct Tile<'a> {
     pub sprite: Sprite<'a>,
     pub is_solid: bool,
     pub bounds: [Option<FloatRect>; 2],
+    pub tile_type: TileType,
 }
 
 impl<'a> Tile<'a> {
-    pub fn new_with_texture(texture: &'a Texture) -> Self {
-        Tile {
-            sprite: Sprite::new_with_texture(texture).unwrap(),
-            is_solid: false,
-            bounds: [None; 2],
-        }
-    }
-
     pub fn new() -> Self {
         Tile {
             sprite: Sprite::new().unwrap(),
             is_solid: false,
             bounds: [None; 2],
+            tile_type: TileType::WallAndFloor,
         }
+    }
+
+    pub fn new_with_texture(texture: &'a Texture) -> Self {
+        let mut new_tile = Tile::new();
+        new_tile.sprite.set_texture(texture, false);
+        new_tile
     }
 }
 
@@ -82,6 +97,10 @@ impl<'a> Wagon<'a> {
                 } else if i == 0 {
                     tile.sprite.set_texture(tex_man.get(TextureId::WallTop), true);
                     tile.bounds[0] = Some(FloatRect::new(0., 58., 64., 6.));
+                } else if i == size_y + 1 && j == size_y / 2 {
+                    tile.tile_type = TileType::Door(Direction::South);
+                    tile.sprite.set_texture(tex_man.get(TextureId::DoorSouth), true);
+                    tile.is_solid = false;
                 } else if i == size_y + 1 {
                     tile.sprite.set_texture(tex_man.get(TextureId::WallBottom), true);
                     tile.bounds[0] = Some(FloatRect::new(0., 0., 64., 6.));
@@ -112,6 +131,10 @@ impl<'a> Wagon<'a> {
             x.set_position2f(dest_x, dest_y);
         }
     }
+
+    // pub fn set_door(&mut self, x: usize, y: usize) {
+    //     self.tiles[x][y] = Tile::new();
+    // }
 
     /// Connects wagon `other` to the *left* side of wagon `self`.
     pub fn connect(&mut self, other: &mut Wagon<'a>, tex_man: &'a TextureManager) {
@@ -240,32 +263,53 @@ impl<'a> Train<'a> {
 
         total_width += 1;
 
-        self.pfgrid_in.grid = vec![vec![PathfindingTile{ walkable:false }; max_height as usize]; total_width as usize];
+        let pad = (2, 2, 2, 2);
+        // 0: top
+        // 1: bot
+        // 2: left
+        // 3: right
+
+        self.pfgrid_in.grid = vec![vec![PathfindingTile{ walkable:false }; (max_height + pad.2 + pad.3) as usize]; (total_width + pad.0 + pad.1) as usize];
+        self.pfgrid_in.padding = pad;
 
         let mut prev_train_width = 0;
+
+        let mut door_idxs: Vec<[(usize, usize); 2]> = vec![];
         for wagon in self.wagons.iter().rev() {
             let this_wagon_height = wagon.tiles.len();
             for (i, t) in wagon.tiles.iter().enumerate() {
                 for (j, t) in t.iter().enumerate() {
-                    self.pfgrid_in.grid[j + prev_train_width][i +
-                                                              (max_height - this_wagon_height) /
-                                                              2]
-                        .walkable = !t.is_solid;
+                    let (x, y) = (pad.2 + j + prev_train_width, pad.0 + i + (max_height - this_wagon_height) / 2);
+                    self.pfgrid_in.grid[x][y].walkable = !t.is_solid;
+                    if let TileType::Door(ref dir) = t.tile_type {
+                        match *dir {
+                            Direction::South => {
+                                door_idxs.push([ (x, y), (x, y - 1) ]);
+                            }
+                            _ => {}
+                        }
+                    }
                 }
             }
             prev_train_width += wagon.tiles[0].len() - 1;
         }
-//        self.pfgrid_in.grid.push(vec![PathfindingTile { walkable: false }; total_width]);
 
         // do all stuff to pfgrid_in before this
         self.pfgrid_out = self.pfgrid_in.clone();
+
         for (i, pft) in self.pfgrid_out.grid.iter_mut().enumerate() {
             for (j, pft) in pft.iter_mut().enumerate() {
-                if !(i == 2 && j == 7) {
-                    pft.walkable = !pft.walkable;
-                }
+                pft.walkable = !pft.walkable;
             }
         }
+
+        for idxs in door_idxs.iter() {
+            for x in 0..2 {
+                self.pfgrid_out.grid[idxs[x].0][idxs[x].1].walkable = true;
+            }
+        }
+
+
 
         self.total_size.x = total_width as u32;
         self.total_size.y = max_height as u32;

@@ -106,8 +106,10 @@ impl<'a> Game<'a> {
         self.train.wagons.push(Wagon::new(&self.resources.tm, 4, 5));
         self.train.wagons.push(Wagon::new(&self.resources.tm, 6, 7));
 
-        self.train.wagons[0].set_position2f(TILE_SIZE_X as f32 * 12., TILE_SIZE_Y as f32 * 2.);
-//        self.train.wagons[1].tiles[6][2] = Tile::new();
+
+//        self.train.wagons[1].tiles[6][2].sprite.set_texture(&self.resources.tm.get(TextureId::DoorSouth), false);
+//        self.train.wagons[1].tiles[6][2].is_solid = false;
+        self.train.wagons[0].set_position2f(TILE_SIZE_X as f32 * 14., TILE_SIZE_Y as f32 * 2.);
         // </test>
 
         {
@@ -122,12 +124,7 @@ impl<'a> Game<'a> {
         self.train.rebuild_pfgrids();
 
         self.actors = vec![Actor::new(&self.resources.tm.get(TextureId::Actor))];//, Actor::new(), Actor::new(), Actor::new()];
-        self.enemies = vec![Enemy::new(&self.resources.tm.get(TextureId::Enemy))];
-
-        
-
-
-
+        self.enemies = vec![Enemy::new(&self.resources.tm.get(TextureId::Enemy)),Enemy::new(&self.resources.tm.get(TextureId::Enemy)),Enemy::new(&self.resources.tm.get(TextureId::Enemy)),Enemy::new(&self.resources.tm.get(TextureId::Enemy))];
 
         //        self.train.screech_snd = Some(self.music_manager.get_mut(MusicId::Screech));
     }
@@ -175,7 +172,7 @@ impl<'a> Game<'a> {
                                         }
                                     }
                                     if let Some(a) = actor_to_unselect {
-                                        self.actors[a].sprite.set_color(&Color::red());
+                                        self.actors[a].sprite.set_color(&Color::white());
                                     }
                                 }
                                 MouseButton::Right => {
@@ -331,7 +328,9 @@ impl<'a> Game<'a> {
 
                 let train_origin = self.train.get_origin();
                 for e in self.enemies.iter_mut() {
-                    e.set_path(&self.train.pfgrid_out, &train_origin, self.train.wagons[0].tiles[0][2].sprite.get_position());
+                    if self.train.current_speed > 0. {
+                        e.set_path(&self.train.pfgrid_out, &train_origin, self.train.wagons[0].tiles[0][2].sprite.get_position());
+                    }
                     e.update_movement(&self.train.wagons, dt);
                 }
 
@@ -402,8 +401,8 @@ impl<'a> Game<'a> {
 
                             let mut shape = RectangleShape::new().unwrap();
                             shape.set_size2f(64., 64.);
-                            shape.set_position2f(i as f32 * 64. + train_origin.x,
-                                                 j as f32 * 64. + train_origin.y);
+                            shape.set_position2f(i as f32 * 64. + train_origin.x - 2. * 64.,
+                                                 j as f32 * 64. + train_origin.y - 2. * 64.);
 
                             if t.walkable {
                                 shape.set_fill_color(&Color::new_rgba(0, 255, 0, 120));
