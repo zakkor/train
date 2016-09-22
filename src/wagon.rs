@@ -13,7 +13,7 @@ use std::vec::IntoIter;
 use std::collections::VecDeque;
 use pathfinding::{PathfindingGrid, PathfindingTile};
 
-#[derive(Clone, PartialEq)]
+#[derive(Clone, PartialEq, Eq, Hash)]
 pub enum Direction {
     North,
     South,
@@ -99,8 +99,8 @@ impl<'a> Wagon<'a> {
                     tile.bounds[0] = Some(FloatRect::new(0., 58., 64., 6.));
                 } else if i == size_y + 1 && j == size_y / 2 {
                     tile.tile_type = TileType::Door(Direction::South);
-                    tile.sprite.set_texture(tex_man.get(TextureId::DoorSouth), true);
-                    tile.is_solid = false;
+                    tile.sprite.set_texture(tex_man.get(TextureId::DoorClosed(Direction::South)), true);
+//                    tile.is_solid = true;
                 } else if i == size_y + 1 {
                     tile.sprite.set_texture(tex_man.get(TextureId::WallBottom), true);
                     tile.bounds[0] = Some(FloatRect::new(0., 0., 64., 6.));
@@ -185,24 +185,24 @@ impl<'a> Drawable for Wagon<'a> {
         for i in 0..(self.tiles.len()) {
             for j in 0..(self.tiles[i].len()) {
                 render_target.draw(&self.tiles[i][j].sprite);
-                if self.tiles[i][j].is_solid {
-                    let bounds = self.tiles[i][j].bounds;
-                    for b in bounds.iter() {
-                        let b = if *b != None {
-                            b.unwrap()
-                        }
-                        else {
-                            continue;
-                        };
-                        let mut shape = RectangleShape::new().unwrap();
-                        shape.set_fill_color(&Color::new_rgba(0, 0, 255, 100));
-                        shape.set_size2f(b.width as f32, b.height as f32);
-                        shape.set_position2f(self.tiles[i][j].sprite.get_position().x + b.left as f32,
-                                             self.tiles[i][j].sprite.get_position().y + b.top as f32);
+                // if self.tiles[i][j].is_solid {
+                //     let bounds = self.tiles[i][j].bounds;
+                //     for b in bounds.iter() {
+                //         let b = if *b != None {
+                //             b.unwrap()
+                //         }
+                //         else {
+                //             continue;
+                //         };
+                //         let mut shape = RectangleShape::new().unwrap();
+                //         shape.set_fill_color(&Color::new_rgba(0, 0, 255, 100));
+                //         shape.set_size2f(b.width as f32, b.height as f32);
+                //         shape.set_position2f(self.tiles[i][j].sprite.get_position().x + b.left as f32,
+                //                              self.tiles[i][j].sprite.get_position().y + b.top as f32);
 
-                        render_target.draw(&shape);
-                    }
-                }
+                //         render_target.draw(&shape);
+                //     }
+                // }
             }
         }
     }
@@ -282,12 +282,14 @@ impl<'a> Train<'a> {
                     let (x, y) = (pad.2 + j + prev_train_width, pad.0 + i + (max_height - this_wagon_height) / 2);
                     self.pfgrid_in.grid[x][y].walkable = !t.is_solid;
                     if let TileType::Door(ref dir) = t.tile_type {
-                        match *dir {
-                            Direction::South => {
-                                door_idxs.push([ (x, y), (x, y - 1) ]);
-                            }
-                            _ => {}
-                        }
+                        let curr = (x, y);
+                        door_idxs.push(
+                            match *dir {
+                                Direction::North => [ curr, (x, y + 1) ],
+                                Direction::South => [ curr, (x, y - 1) ],
+                                Direction::West => [ curr, (x + 1, y) ],
+                                Direction::East => [ curr, (x - 1, y) ],
+                            });
                     }
                 }
             }
@@ -304,12 +306,11 @@ impl<'a> Train<'a> {
         }
 
         for idxs in door_idxs.iter() {
-            for x in 0..2 {
-                self.pfgrid_out.grid[idxs[x].0][idxs[x].1].walkable = true;
+            self.pfgrid_out.grid[idxs[0].0][idxs[0].1].walkable = true;
+            if self.pfgrid_in.grid[idxs[0].0][idxs[0].1].walkable == true {
+                self.pfgrid_out.grid[idxs[1].0][idxs[1].1].walkable = true;
             }
         }
-
-
 
         self.total_size.x = total_width as u32;
         self.total_size.y = max_height as u32;

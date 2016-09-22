@@ -3,6 +3,7 @@ use std::hash::Hash;
 extern crate sfml;
 use sfml::graphics::{Texture, Font};
 use sfml::audio::{Music, SoundBuffer};
+use wagon::Direction;
 
 pub trait Resource: Sized {
     fn new_from_file(filename: &str) -> Option<Self>;
@@ -81,7 +82,8 @@ pub enum TextureId {
     Background,
     Actor,
     Enemy,
-    DoorSouth,
+    DoorOpen(Direction),
+    DoorClosed(Direction),
 }
 #[derive(PartialEq, Eq, Hash)]
 pub enum FontId {
@@ -135,7 +137,8 @@ impl Resources {
         tm.load(TextureId::Background, "res/bg.png");
         tm.load(TextureId::Actor, "res/actor.png");
         tm.load(TextureId::Enemy, "res/enemy.png");
-        tm.load(TextureId::DoorSouth, "res/door_south.png");
+        tm.load(TextureId::DoorOpen(Direction::South), "res/door_south.png");
+        tm.load(TextureId::DoorClosed(Direction::South), "res/door_closed_south.png");
 
         let mut sm = SoundManager::new();
 //        sm.

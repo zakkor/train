@@ -174,6 +174,29 @@ impl<'a> Game<'a> {
                                     if let Some(a) = actor_to_unselect {
                                         self.actors[a].sprite.set_color(&Color::white());
                                     }
+
+                                    // open/close door
+                                    let mut pfgrids_must_be_rebuilt = false;
+                                    for w in self.train.wagons.iter_mut() {
+                                        for t in w.tiles.iter_mut() {
+                                            for t in t.iter_mut() {
+                                                if let TileType::Door(ref dir) = t.tile_type {
+                                                    if t.is_solid {
+                                                        // open it
+                                                        t.is_solid = false;
+                                                        t.sprite.set_texture(&self.resources.tm.get(TextureId::DoorOpen(dir.clone())), false);
+                                                    } else {
+                                                        t.is_solid = true;
+                                                        t.sprite.set_texture(&self.resources.tm.get(TextureId::DoorClosed(dir.clone())), false);
+                                                    }
+                                                    pfgrids_must_be_rebuilt = true;
+                                                }
+                                            }
+                                        }
+                                    }
+                                    if pfgrids_must_be_rebuilt {
+                                        self.train.rebuild_pfgrids();
+                                    }
                                 }
                                 MouseButton::Right => {
                                     if let Some(selected_actor) = self.selected_actor {
@@ -370,20 +393,14 @@ impl<'a> Game<'a> {
                     self.window.draw(rail);
                 }
 
-                for a in self.actors.iter() {
-                    if !a.inside_wagon {
-                        self.window.draw(&a.sprite);
-                    }
-                }
+
 
                 for w in self.train.wagons.iter() {
                     self.window.draw(w);
                 }
 
                 for a in self.actors.iter() {
-                    if a.inside_wagon {
-                        self.window.draw(&a.sprite);
-                    }
+                    self.window.draw(&a.sprite);
                 }
 
                 for e in self.enemies.iter() {
