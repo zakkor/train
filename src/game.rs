@@ -175,27 +175,47 @@ impl<'a> Game<'a> {
                                         self.actors[a].sprite.set_color(&Color::white());
                                     }
 
-                                    // open/close door
-                                    let mut pfgrids_must_be_rebuilt = false;
-                                    for w in self.train.wagons.iter_mut() {
-                                        for t in w.tiles.iter_mut() {
-                                            for t in t.iter_mut() {
-                                                if let TileType::Door(ref dir) = t.tile_type {
-                                                    if t.is_solid {
-                                                        // open it
-                                                        t.is_solid = false;
-                                                        t.sprite.set_texture(&self.resources.tm.get(TextureId::DoorOpen(dir.clone())), false);
-                                                    } else {
-                                                        t.is_solid = true;
-                                                        t.sprite.set_texture(&self.resources.tm.get(TextureId::DoorClosed(dir.clone())), false);
+                                    if let Some(sa) = self.selected_actor {
+                                        let click_pos = self.window
+                                            .map_pixel_to_coords_current_view(&self.window
+                                                                              .get_mouse_position());
+                                        // open/close door
+                                        let mut pfgrids_must_be_rebuilt = false;
+                                        let train_origin = self.train.get_origin();
+                                        for w in self.train.wagons.iter_mut() {
+                                            for t in w.tiles.iter_mut() {
+                                                for t in t.iter_mut() {
+                                                    if let TileType::Door(ref dir) = t.tile_type {
+                                                        let actor = &mut self.actors[sa];
+
+                                                        if t.sprite.get_global_bounds().contains(click_pos) {
+                                                            if let Some(n) = actor.number_of_steps_to(&self.train.pfgrid_all, &train_origin, click_pos) {
+                                                                let required_n = if actor.inside_wagon {
+                                                                    1
+                                                                } else {
+                                                                    0
+                                                                };
+
+                                                                if n == required_n {
+                                                                    if t.is_solid {
+                                                                        // open it
+                                                                        t.is_solid = false;
+                                                                        t.sprite.set_texture(&self.resources.tm.get(TextureId::DoorOpen(dir.clone())), false);
+                                                                    } else {
+                                                                        t.is_solid = true;
+                                                                        t.sprite.set_texture(&self.resources.tm.get(TextureId::DoorClosed(dir.clone())), false);
+                                                                    }
+                                                                    pfgrids_must_be_rebuilt = true;
+                                                                }
+                                                            }
+                                                        }
                                                     }
-                                                    pfgrids_must_be_rebuilt = true;
                                                 }
                                             }
                                         }
-                                    }
-                                    if pfgrids_must_be_rebuilt {
-                                        self.train.rebuild_pfgrids();
+                                        if pfgrids_must_be_rebuilt {
+                                            self.train.rebuild_pfgrids();
+                                        }
                                     }
                                 }
                                 MouseButton::Right => {

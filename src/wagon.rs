@@ -218,6 +218,7 @@ pub struct Train<'a> {
     pub accel: f32,
     pub pfgrid_in: PathfindingGrid,
     pub pfgrid_out: PathfindingGrid,
+    pub pfgrid_all: PathfindingGrid,
     pub total_size: Vector2u,
 }
 
@@ -231,6 +232,7 @@ impl<'a> Train<'a> {
             accel: 0.,
             pfgrid_in: PathfindingGrid::new(),
             pfgrid_out: PathfindingGrid::new(),
+            pfgrid_all: PathfindingGrid::new(),
             total_size: Vector2u::new(0, 0),
         }
     }
@@ -270,6 +272,8 @@ impl<'a> Train<'a> {
         // 1: bot
         // 2: left
         // 3: right
+        self.pfgrid_all.grid = vec![vec![PathfindingTile{ walkable:true }; (max_height + pad.2 + pad.3) as usize]; (total_width + pad.0 + pad.1) as usize];
+        self.pfgrid_all.padding = pad;
 
         self.pfgrid_in.grid = vec![vec![PathfindingTile{ walkable:false }; (max_height + pad.2 + pad.3) as usize]; (total_width + pad.0 + pad.1) as usize];
         self.pfgrid_in.padding = pad;

@@ -114,6 +114,7 @@ pub trait Pathfinding {
         if let Some(path) = astar(&mut ts) {
             let mut path = path.iter();
             path.next();
+            println!("len: {}", path.len());
             for step in path {
                 self.add_step(Vector2f::new((step.0 as f32 + (train_pos.y - 2. * 64.) / TILE_SIZE_X as f32) * TILE_SIZE_X as f32 +
                                             TILE_SIZE_X as f32 / 2.,
@@ -123,6 +124,28 @@ pub trait Pathfinding {
             true
         } else {
             false
+        }
+    }
+
+    fn number_of_steps_to(&self, grid: &PathfindingGrid, train_pos: &Vector2f, click_pos: Vector2f) -> Option<usize> {
+        let start = (self.get_pos().x as i32 / TILE_SIZE_X as i32
+                     - (train_pos.x - grid.padding.2 as f32 * TILE_SIZE_X as f32) as i32 / TILE_SIZE_X as i32,
+
+                     self.get_pos().y as i32 / TILE_SIZE_Y as i32
+                     - (train_pos.y - grid.padding.0 as f32 * TILE_SIZE_X as f32) as i32 / TILE_SIZE_Y as i32);
+
+        let end = (click_pos.x as i32 / TILE_SIZE_X as i32 - (train_pos.x - 2. * 64.) as i32 / TILE_SIZE_X as i32,
+                   click_pos.y as i32 / TILE_SIZE_Y as i32 - (train_pos.y - 2. * 64.) as i32 / TILE_SIZE_Y as i32);
+
+        let mut ts = GridSearch::new(grid, start, end);
+
+        if let Some(path) = astar(&mut ts) {
+            let mut path = path.iter();
+            path.next();
+
+            Some(path.len())
+        } else {
+            None
         }
     }
 
