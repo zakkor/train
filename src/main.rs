@@ -18,6 +18,8 @@ mod game;
 use game::Game;
 mod world;
 mod camera;
+mod enemy;
+mod pathfinding;
 
 mod game_consts {
     pub const TILE_SIZE_X: u32 = 64;

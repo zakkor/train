@@ -11,6 +11,7 @@ use astar::*;
 
 use std::vec::IntoIter;
 use std::collections::VecDeque;
+use pathfinding::{PathfindingGrid, PathfindingTile};
 
 #[derive(Clone)]
 pub struct Tile<'a> {
@@ -254,7 +255,9 @@ impl<'a> Train<'a> {
             }
             prev_train_width += wagon.tiles[0].len() - 1;
         }
+//        self.pfgrid_in.grid.push(vec![PathfindingTile { walkable: false }; total_width]);
 
+        // do all stuff to pfgrid_in before this
         self.pfgrid_out = self.pfgrid_in.clone();
         for (i, pft) in self.pfgrid_out.grid.iter_mut().enumerate() {
             for (j, pft) in pft.iter_mut().enumerate() {
@@ -267,80 +270,12 @@ impl<'a> Train<'a> {
         self.total_size.x = total_width as u32;
         self.total_size.y = max_height as u32;
     }
-}
 
-#[derive(Copy, Clone)]
-pub struct PathfindingTile {
-    pub walkable: bool,
-}
-
-#[derive(Clone)]
-pub struct PathfindingGrid {
-    pub grid: Vec<Vec<PathfindingTile>>,
-}
-
-impl PathfindingGrid {
-    pub fn new() -> Self {
-        PathfindingGrid { grid: vec![] }
-    }
-}
-
-pub trait Walkable {
-    fn is_walkable(&self, x: i32, y: i32) -> bool;
-}
-
-impl Walkable for Vec<Vec<PathfindingTile>> {
-    fn is_walkable(&self, x: i32, y: i32) -> bool {
-        self[x as usize][y as usize].walkable
-    }
-}
-
-pub struct TrainSearch<'a> {
-    grid: &'a PathfindingGrid,
-    start: (i32, i32),
-    end: (i32, i32),
-}
-
-impl<'a> TrainSearch<'a> {
-    pub fn new(grid: &'a PathfindingGrid, start: (i32, i32), end: (i32, i32)) -> Self {
-        TrainSearch {
-            grid: grid,
-            start: start,
-            end: end,
-        }
-    }
-}
-
-impl<'a> SearchProblem for TrainSearch<'a> {
-    type Node = (i32, i32);
-    type Cost = i32;
-    type Iter = IntoIter<((i32, i32), i32)>;
-    fn start(&self) -> (i32, i32) {
-        self.start
-    }
-    fn is_end(&self, p: &(i32, i32)) -> bool {
-        *p == self.end
-    }
-    fn heuristic(&self, &(p_x, p_y): &(i32, i32)) -> i32 {
-        let (s_x, s_y) = self.end;
-        (s_x - p_x).abs() + (s_y - p_y).abs()
-    }
-    fn neighbors(&mut self, &(x, y): &(i32, i32)) -> IntoIter<((i32, i32), i32)> {
-        let mut vec = vec![];
-        for i in -1..1 + 1 {
-            for k in -1..1 + 1 {
-                if !(i == 0 && k == 0)
-                    // fucking corners
-                    && !(i == -1 && k == -1) && !(i == -1 && k == 1) &&
-                   !(i == 1 && k == -1) &&
-                   !(i == 1 && k == 1) && x + i >= 0 && y + k >= 0 &&
-                   x + i < self.grid.grid.len() as i32 &&
-                   y + k < self.grid.grid[0].len() as i32 &&
-                   self.grid.grid.is_walkable(x + i, y + k) {
-                    vec.push(((x + i, y + k), 1));
-                }
-            }
-        }
-        vec.into_iter()
+    pub fn get_origin(&self) -> Vector2f {
+        let first_wagon_height = self.wagons.last().unwrap().tiles.len();
+        let first_tile_pos = self.wagons.last().unwrap().tiles[0][0].sprite.get_position();
+        let train_pos = Vector2f::new(first_tile_pos.x,
+                                      first_tile_pos.y - ((self.total_size.y as f32 - first_wagon_height as f32) / 2.) * TILE_SIZE_Y as f32);
+        train_pos
     }
 }

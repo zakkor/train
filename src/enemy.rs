@@ -6,32 +6,33 @@ use std::collections::VecDeque;
 use wagon::*;
 use game_consts::*;
 use astar::*;
-use pathfinding::*;
+use pathfinding::Pathfinding;
 
-pub struct Actor<'a> {
+pub struct Enemy<'a> {
     pub sprite: Sprite<'a>,
     pub inside_wagon: bool,
     pub move_seq: VecDeque<Vector2f>,
 }
 
-impl<'a> Actor<'a> {
+impl<'a> Enemy<'a> {
     pub fn new(texture: &'a Texture) -> Self {
         let mut sprite = Sprite::new().unwrap();
-//        sprite.set_size2f(25., 25.);
-        sprite.set_color(&Color::red());
-        sprite.set_position2f(1280. / 2. - 100., 500.);
+        //sprite.set_size2f(25., 25.);
+        sprite.set_color(&Color::yellow());
+        sprite.set_position2f(25. + TILE_SIZE_X as f32 * 6.,
+                              25. + TILE_SIZE_Y as f32 * 2.);
         sprite.set_origin2f(25. / 2., 25. / 2.);
         sprite.set_texture(texture, true);
 
-        Actor {
+        Enemy {
             sprite: sprite,
-            inside_wagon: true,
+            inside_wagon: false,
             move_seq: VecDeque::new(),
         }
     }
 }
 
-impl<'a> Pathfinding for Actor<'a> {
+impl<'a> Pathfinding for Enemy<'a> {
     fn clear_steps(&mut self) {
         self.move_seq.clear();
     }
