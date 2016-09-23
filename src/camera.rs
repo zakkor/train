@@ -2,7 +2,8 @@ use sfml::graphics::View;
 use sfml::system::Vector2f;
 
 pub struct Camera {
-    pub view: View,
+    pub game: View,
+    pub ui: View,
     zoom_step: f32,
     pub mouse_pos_old: Vector2f,
 }
@@ -10,7 +11,8 @@ pub struct Camera {
 impl Camera {
     pub fn new() -> Self {
         Camera {
-            view: View::new().unwrap(),
+            game: View::new().unwrap(),
+            ui: View::new_init(&Vector2f::new(1600. / 2., 1200. / 2.), &Vector2f::new(1600., 1200.)).unwrap(),
             zoom_step: 0.1,
             mouse_pos_old: Vector2f::new(0., 0.),
         }
@@ -20,7 +22,7 @@ impl Camera {
         let move_factor = Vector2f::new(self.mouse_pos_old.x - mouse_pos.x,
                                         self.mouse_pos_old.y - mouse_pos.y);
 
-        self.view.move_(&move_factor);
+        self.game.move_(&move_factor);
     }
 
     pub fn zoom(&mut self, delta: i32) {
@@ -29,6 +31,6 @@ impl Camera {
             false => 1.0 - self.zoom_step,
         };
 
-        self.view.zoom(zoom_factor);
+        self.game.zoom(zoom_factor);
     }
 }

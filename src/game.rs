@@ -32,6 +32,8 @@ pub struct Game<'a> {
     world: World<'a>,
     camera: Camera,
     tile_selection: RectangleShape<'a>,
+    paused_text: Text<'a>,
+    is_paused: bool
 }
 
 impl<'a> Game<'a> {
@@ -43,7 +45,7 @@ impl<'a> Game<'a> {
                                            &ContextSettings::default())
             .unwrap();
 
-        window.set_framerate_limit(60);
+        window.set_framerate_limit(120);
         window.set_vertical_sync_enabled(true);
 
         let mut state_stack = StateStack::new();
@@ -51,7 +53,7 @@ impl<'a> Game<'a> {
 
         let mut tile_selection = RectangleShape::new().unwrap();
         tile_selection.set_size2f(TILE_SIZE_X as f32, TILE_SIZE_Y as f32);
-        tile_selection.set_fill_color(&Color::new_rgba(255, 255, 0, 140));
+        tile_selection.set_fill_color(&Color::new_rgba(255, 255, 0, 60));
 
         Game {
             resources: resources,
@@ -71,6 +73,8 @@ impl<'a> Game<'a> {
             },
             camera: Camera::new(),
             tile_selection: tile_selection,
+            paused_text: Text::new().unwrap(),
+            is_paused: false,
         }
     }
 
@@ -87,7 +91,7 @@ impl<'a> Game<'a> {
 
     /// Initializes all the game objects (Example: run this to start a new game)
     fn init(&mut self) {
-        self.camera.view = self.window.get_default_view();
+        self.camera.game = self.window.get_default_view();
 
         self.world.init(&self.resources.tm);
 
@@ -124,9 +128,16 @@ impl<'a> Game<'a> {
         self.train.rebuild_pfgrids();
 
         self.actors = vec![Actor::new(&self.resources.tm.get(TextureId::Actor))];//, Actor::new(), Actor::new(), Actor::new()];
-        self.enemies = vec![Enemy::new(&self.resources.tm.get(TextureId::Enemy)),Enemy::new(&self.resources.tm.get(TextureId::Enemy)),Enemy::new(&self.resources.tm.get(TextureId::Enemy)),Enemy::new(&self.resources.tm.get(TextureId::Enemy))];
+        self.enemies = vec![Enemy::new(&self.resources.tm.get(TextureId::Enemy)),
+                            Enemy::new(&self.resources.tm.get(TextureId::Enemy)),
+                            Enemy::new(&self.resources.tm.get(TextureId::Enemy)),
+                            Enemy::new(&self.resources.tm.get(TextureId::Enemy))];
 
         //        self.train.screech_snd = Some(self.music_manager.get_mut(MusicId::Screech));
+        self.paused_text.set_font(&self.resources.fm.get(FontId::Joystix));
+        self.paused_text.set_string("PAUSED");
+        self.paused_text.set_character_size(36);
+        self.paused_text.set_position2f(WINDOW_SIZE_X as f32 / 2. - 100., WINDOW_SIZE_Y as f32 / 2. + 300.);
     }
 
     fn process_events(&mut self) {
@@ -138,7 +149,7 @@ impl<'a> Game<'a> {
                         self.camera.move_by_mouse(&self.window
                             .map_pixel_to_coords_current_view(&self.window.get_mouse_position()));
 
-                        self.window.set_view(&self.camera.view);
+                        self.window.set_view(&self.camera.game);
                     }
                     self.camera.mouse_pos_old = self.window
                         .map_pixel_to_coords_current_view(&self.window.get_mouse_position());
@@ -182,7 +193,7 @@ impl<'a> Game<'a> {
                                         // open/close door
                                         let mut pfgrids_must_be_rebuilt = false;
                                         let train_origin = self.train.get_origin();
-                                        for w in self.train.wagons.iter_mut() {
+                                        'all: for w in self.train.wagons.iter_mut() {
                                             for t in w.tiles.iter_mut() {
                                                 for t in t.iter_mut() {
                                                     if let TileType::Door(ref dir) = t.tile_type {
@@ -206,7 +217,23 @@ impl<'a> Game<'a> {
                                                                         t.sprite.set_texture(&self.resources.tm.get(TextureId::DoorClosed(dir.clone())), false);
                                                                     }
                                                                     pfgrids_must_be_rebuilt = true;
+                                                                } else {
+                                                                    let pfgrid_to_use = if actor.inside_wagon {
+                                                                        &self.train.pfgrid_in
+                                                                    } else {
+                                                                        &self.train.pfgrid_out
+                                                                    };
+
+                                                                    let dest = match *dir {
+                                                                        Direction::North => Vector2f::new(click_pos.x, click_pos.y + (TILE_SIZE_Y * 1) as f32),
+                                                                        Direction::South => Vector2f::new(click_pos.x, click_pos.y - (TILE_SIZE_Y * 1) as f32),
+                                                                        Direction::East => Vector2f::new(click_pos.x - (TILE_SIZE_X * 1) as f32, click_pos.y),
+                                                                        Direction::West => Vector2f::new(click_pos.x + (TILE_SIZE_X * 1) as f32, click_pos.y),
+                                                                    };
+
+                                                                    actor.set_path(pfgrid_to_use, &train_origin, dest);
                                                                 }
+                                                                break 'all;
                                                             }
                                                         }
                                                     }
@@ -244,7 +271,7 @@ impl<'a> Game<'a> {
                         }
                         event::MouseWheelMoved { delta, .. } => {
                             self.camera.zoom(delta);
-                            self.window.set_view(&self.camera.view);
+                            self.window.set_view(&self.camera.game);
 //                            self.world.recalculate_drawables(&self.camera.view, &self.window.map_pixel_to_coords_current_view(&Vector2i::new(0, 0)), &self.resources.tm);
                         }
                         event::KeyReleased { code, .. } => {
@@ -252,31 +279,28 @@ impl<'a> Game<'a> {
                                 self.state_stack.push(StateType::Menu);
                                 println!("{:?}", self.state_stack);
                             }
-                            if let Key::Space = code {
-                                self.train.moving = !self.train.moving;
-                                // {
-                                //     let mut train_sound = self.music_manager.get_mut(MusicId::Train);
-                                //     train_sound.set_loop(true);
-                                //     train_sound.set_volume(25.);
-                                //     if train_sound.get_status() == SoundStatus::Stopped {
-                                //         train_sound.play();
-                                //     } else {
-                                //         train_sound.stop();
-                                //     }
-                                // }
 
-                                // {
-                                //     if !self.train.moving {
-                                //         let mut screech_sound = self.music_manager.get_mut(MusicId::Screech);
-                                //         screech_sound.set_loop(true);
-                                //         screech_sound.set_volume(25.);
-                                //         if screech_sound.get_status() == SoundStatus::Stopped {
-                                //             screech_sound.play();
-                                //         } else {
-                                //             screech_sound.stop();
-                                //         }
-                                //     }
-                                // }
+                            if let Key::Space = code {
+                                self.is_paused = !self.is_paused;
+                            }
+
+                            if let Key::G = code {
+                                self.train.moving = !self.train.moving;
+                                {
+                                    let mut train_sound = self.music_manager.get_mut(MusicId::Train);
+                                    train_sound.set_loop(true);
+                                    if train_sound.get_status() == SoundStatus::Stopped {
+                                        train_sound.play();
+                                    }
+                                }
+
+                                {
+                                    if !self.train.moving {
+                                        let mut screech_sound = self.music_manager.get_mut(MusicId::Screech);
+                                        screech_sound.set_loop(true);
+                                        screech_sound.play();
+                                    }
+                                }
                             }
                         }
                         _ => {}
@@ -363,35 +387,67 @@ impl<'a> Game<'a> {
         let time = self.clock.restart();
         match *self.state_stack.top().unwrap() {
             StateType::Playing => {
-                let dt = time.as_seconds();
+                if !self.is_paused {
+                    let dt = time.as_seconds();
 
-                for a in self.actors.iter_mut() {
-                    a.update_movement(&self.train.wagons, dt);
-                }
+                    for a in self.actors.iter_mut() {
+                        a.update_movement(&self.train.wagons, dt);
+                    }
 
-                let train_origin = self.train.get_origin();
-                for e in self.enemies.iter_mut() {
+                    let train_origin = self.train.get_origin();
+                    for e in self.enemies.iter_mut() {
+                        if self.train.current_speed > 0. {
+                            e.set_path(&self.train.pfgrid_out, &train_origin, self.train.wagons[0].tiles[0][2].sprite.get_position());
+                        }
+                        e.update_movement(&self.train.wagons, dt);
+                    }
+
+                    self.world.update(dt * -self.train.current_speed);
+
+                    self.train.update();
+
+
+                    // sounds
                     if self.train.current_speed > 0. {
-                        e.set_path(&self.train.pfgrid_out, &train_origin, self.train.wagons[0].tiles[0][2].sprite.get_position());
+                        {
+                            let mut train_sound = self.music_manager.get_mut(MusicId::Train);
+                            train_sound.set_volume(100. * self.train.current_speed / self.train.top_speed);
+
+                            if !self.train.moving && self.train.current_speed <= self.train.top_speed / 4. {
+                                train_sound.stop();
+                            }
+                        }
+                        {
+                            if !self.train.moving {
+                                let mut screech_sound = self.music_manager.get_mut(MusicId::Screech);
+                                screech_sound.set_volume(70. * self.train.current_speed / self.train.top_speed);
+                            }
+                        }
+                    } else {
+                        // {
+                        //     let mut train_sound = self.music_manager.get_mut(MusicId::Train);
+                        //     train_sound.stop();
+                        // }
+                        {
+                            let mut screech_sound = self.music_manager.get_mut(MusicId::Screech);
+                            screech_sound.stop();
+                        }
                     }
-                    e.update_movement(&self.train.wagons, dt);
-                }
 
-                self.world.update(dt * -self.train.current_speed);
+                    //
 
-                self.train.update();
-
-                for a in self.actors.iter_mut() {
-                    if !a.inside_wagon {
-                        // add collision checking to this (refactor what is above into a checking function)
-                        a.sprite.move2f(dt * -self.train.current_speed, 0.);
+                    for a in self.actors.iter_mut() {
+                        if !a.inside_wagon {
+                            // add collision checking to this (refactor what is above into a checking function)
+                            a.sprite.move2f(dt * -self.train.current_speed, 0.);
+                        }
                     }
-                }
 
-                for e in self.enemies.iter_mut() {
-                    if !e.inside_wagon {
-                        // add collision checking to this (refactor what is above into a checking function)
-                        e.sprite.move2f(dt * -self.train.current_speed, 0.);
+                    for e in self.enemies.iter_mut() {
+                        if !e.inside_wagon {
+                            // add collision checking to this (refactor what is above into a checking function)
+                            e.sprite.move2f(dt * -self.train.current_speed, 0.);
+                        }
                     }
                 }
             }
@@ -402,6 +458,7 @@ impl<'a> Game<'a> {
     fn render(&mut self) {
         match *self.state_stack.top().unwrap() {
             StateType::Playing => {
+                self.window.set_view(&self.camera.game);
                 // Clear the window
                 self.window.clear(&Color::yellow());
 
@@ -413,13 +470,21 @@ impl<'a> Game<'a> {
                     self.window.draw(rail);
                 }
 
-
-
                 for w in self.train.wagons.iter() {
                     self.window.draw(w);
                 }
 
                 for a in self.actors.iter() {
+                    // draw path
+                    let steps = Vec::from(a.move_seq.clone());
+                    for step in steps.windows(2) {
+                        let mut va = VertexArray::new().unwrap();
+                        va.set_primitive_type(PrimitiveType::sfLines);
+                        va.append(&Vertex::new_with_pos_color(&step[0], &Color::green()));
+                        va.append(&Vertex::new_with_pos_color(&step[1], &Color::green()));
+                        self.window.draw(&va);
+                    }
+
                     self.window.draw(&a.sprite);
                 }
 
@@ -427,32 +492,40 @@ impl<'a> Game<'a> {
                     self.window.draw(&e.sprite);
                 }
 
-                if let Some(selected_actor) = self.selected_actor {
-                    for (i, t) in if self.actors[selected_actor].inside_wagon {
-                        self.train.pfgrid_in.grid.iter().enumerate()
-                    } else {
-                        self.train.pfgrid_out.grid.iter().enumerate()
-                    } {
-                        for (j, t) in t.iter().enumerate() {
-                            let train_origin = self.train.get_origin();
+                // if let Some(selected_actor) = self.selected_actor {
+                //     for (i, t) in if self.actors[selected_actor].inside_wagon {
+                //         self.train.pfgrid_in.grid.iter().enumerate()
+                //     } else {
+                //         self.train.pfgrid_out.grid.iter().enumerate()
+                //     } {
+                //         for (j, t) in t.iter().enumerate() {
+                //             let train_origin = self.train.get_origin();
 
-                            let mut shape = RectangleShape::new().unwrap();
-                            shape.set_size2f(64., 64.);
-                            shape.set_position2f(i as f32 * 64. + train_origin.x - 2. * 64.,
-                                                 j as f32 * 64. + train_origin.y - 2. * 64.);
+                //             let mut shape = RectangleShape::new().unwrap();
+                //             shape.set_size2f(64., 64.);
+                //             shape.set_position2f(i as f32 * 64. + train_origin.x - 2. * 64.,
+                //                                  j as f32 * 64. + train_origin.y - 2. * 64.);
 
-                            if t.walkable {
-                                shape.set_fill_color(&Color::new_rgba(0, 255, 0, 120));
-                            } else {
-                                shape.set_fill_color(&Color::new_rgba(255, 0, 0, 120));
-                            }
+                //             if t.walkable {
+                //                 shape.set_fill_color(&Color::new_rgba(0, 255, 0, 120));
+                //             } else {
+                //                 shape.set_fill_color(&Color::new_rgba(255, 0, 0, 120));
+                //             }
 
-                            self.window.draw(&shape);
-                        }
-                    }
-                }
+                //             self.window.draw(&shape);
+                //         }
+                //     }
+                // }
 
                 self.window.draw(&self.tile_selection);
+
+                if self.is_paused {
+                    // ui view
+                    self.window.set_view(&self.camera.ui);
+                    self.window.draw(&self.paused_text);
+                    self.window.set_view(&self.camera.game);
+                }
+
             }
             StateType::Menu => {
                 self.window.clear(&Color::black());

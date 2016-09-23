@@ -248,7 +248,7 @@ impl<'a> Train<'a> {
                 self.current_speed += self.accel;
             }
         } else if self.current_speed > 0. {
-            self.current_speed -= self.accel * 2.;
+            self.current_speed -= self.accel / 2.;
         }
     }
 
