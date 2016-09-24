@@ -114,7 +114,7 @@ pub trait Pathfinding {
         if let Some(path) = astar(&mut ts) {
             let mut path = path.iter();
             path.next();
-            println!("len: {}", path.len());
+
             for step in path {
                 self.add_step(Vector2f::new((step.0 as f32 + (train_pos.y - 2. * 64.) / TILE_SIZE_X as f32) * TILE_SIZE_X as f32 +
                                             TILE_SIZE_X as f32 / 2.,

@@ -218,18 +218,19 @@ impl<'a> Game<'a> {
                                                                     }
                                                                     pfgrids_must_be_rebuilt = true;
                                                                 } else {
-                                                                    let pfgrid_to_use = if actor.inside_wagon {
-                                                                        &self.train.pfgrid_in
+                                                                    let (pfgrid_to_use, dest) = if actor.inside_wagon {
+                                                                        (&self.train.pfgrid_in, match *dir {
+                                                                            Direction::North => Vector2f::new(click_pos.x, click_pos.y + (TILE_SIZE_Y * 1) as f32),
+                                                                            Direction::South => Vector2f::new(click_pos.x, click_pos.y - (TILE_SIZE_Y * 1) as f32),
+                                                                            Direction::East => Vector2f::new(click_pos.x - (TILE_SIZE_X * 1) as f32, click_pos.y),
+                                                                            Direction::West => Vector2f::new(click_pos.x + (TILE_SIZE_X * 1) as f32, click_pos.y),})
                                                                     } else {
-                                                                        &self.train.pfgrid_out
+                                                                        (&self.train.pfgrid_out, match *dir {
+                                                                            _ => Vector2f::new(click_pos.x, click_pos.y),
+                                                                        })
                                                                     };
 
-                                                                    let dest = match *dir {
-                                                                        Direction::North => Vector2f::new(click_pos.x, click_pos.y + (TILE_SIZE_Y * 1) as f32),
-                                                                        Direction::South => Vector2f::new(click_pos.x, click_pos.y - (TILE_SIZE_Y * 1) as f32),
-                                                                        Direction::East => Vector2f::new(click_pos.x - (TILE_SIZE_X * 1) as f32, click_pos.y),
-                                                                        Direction::West => Vector2f::new(click_pos.x + (TILE_SIZE_X * 1) as f32, click_pos.y),
-                                                                    };
+
 
                                                                     actor.set_path(pfgrid_to_use, &train_origin, dest);
                                                                 }
