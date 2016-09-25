@@ -94,13 +94,13 @@ impl<'a> Wagon<'a> {
                 } else if j == size_x + 1 {
                     tile.sprite.set_texture(tex_man.get(TextureId::WallRight), true);
                     tile.bounds[0] = Some(FloatRect::new(0., 0., 6., 64.));
-                } else if i == 0 && j == size_y / 2 {
+                } else if i == 0 && j == size_x / 2 {
                     tile.tile_type = TileType::Door(Direction::North);
                     tile.sprite.set_texture(tex_man.get(TextureId::DoorClosed(Direction::North)), true);
                 } else if i == 0 {
                     tile.sprite.set_texture(tex_man.get(TextureId::WallTop), true);
                     tile.bounds[0] = Some(FloatRect::new(0., 58., 64., 6.));
-                } else if i == size_y + 1 && j == size_y / 2 {
+                } else if i == size_y + 1 && j == size_x / 2 {
                     tile.tile_type = TileType::Door(Direction::South);
                     tile.sprite.set_texture(tex_man.get(TextureId::DoorClosed(Direction::South)), true);
                 } else if i == size_y + 1 {
@@ -120,23 +120,28 @@ impl<'a> Wagon<'a> {
         }
     }
 
-    pub fn set_position2f(&mut self, dest_x: f32, dest_y: f32) {
-        for i in 0..(self.tiles.len()) {
-            for j in 0..(self.tiles[i].len()) {
-                let current_x = self.tiles[i][j].sprite.get_position().x;
-                let current_y = self.tiles[i][j].sprite.get_position().y;
-                self.tiles[i][j].sprite.set_position2f(current_x + dest_x, current_y + dest_y);
+    pub fn set_position2f(&mut self, x: f32, y: f32) {
+        let origin = self.tiles[0][0].sprite.get_position();
+        let difference = Vector2f::new((x - origin.x).abs(), (y - origin.y).abs());
+
+        for tls in self.tiles.iter_mut() {
+            for t in tls.iter_mut() {
+                t.sprite.move_(&difference);
             }
         }
 
-        if let Some(ref mut x) = self.connected_to[0] {
-            x.set_position2f(dest_x, dest_y);
-        }
+        //     // if let Some(ref mut x) = self.connected_to[0] {
+        //     //     x.set_position2f(dest_x, dest_y);
+        //     // }
     }
 
-    // pub fn set_door(&mut self, x: usize, y: usize) {
-    //     self.tiles[x][y] = Tile::new();
-    // }
+    pub fn move2f(&mut self, x: f32, y: f32) {
+        for tls in self.tiles.iter_mut() {
+            for t in tls.iter_mut() {
+                t.sprite.move2f(x, y);
+            }
+        }
+    }
 
     /// Connects wagon `other` to the *left* side of wagon `self`.
     pub fn connect(&mut self, other: &mut Wagon<'a>, tex_man: &'a TextureManager) {
@@ -177,8 +182,11 @@ impl<'a> Wagon<'a> {
             -((other_height_half - self_height_half) as i32)
         } * TILE_SIZE_Y as i32;
 
-        other.set_position2f((self.tiles[0][0].sprite.get_position().x - ((other_width - 1) * TILE_SIZE_X as usize) as f32) as f32,
-                             self.tiles[0][0].sprite.get_position().y + y_offset as f32);
+//        other.set_position2f((self.tiles[0][0].sprite.get_position().x - ((other_width - 1) * TILE_SIZE_X as usize) as f32) as f32,
+//                             self.tiles[0][0].sprite.get_position().y + y_offset as f32);
+
+//        self.connected_to[0] = Some(other);
+//        other.connected_to[1] = Some(self);
     }
 }
 
@@ -249,6 +257,14 @@ impl<'a> Train<'a> {
             }
         } else if self.current_speed > 0. {
             self.current_speed -= self.accel / 2.;
+        }
+    }
+
+    pub fn set_position2f(&mut self, x: f32, y: f32) {
+        let difference = (self.wagons.last().unwrap().tiles[0][0].sprite.get_position().x - x).abs();
+        for w in self.wagons.iter_mut().rev() {
+            w.move2f(difference, y);
+//            last_pos = w.tiles[0][0].sprite.get_position().x * TILE_SIZE_X as f32;
         }
     }
 

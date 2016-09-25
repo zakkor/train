@@ -184,7 +184,7 @@ pub trait Pathfinding {
         let current_pos = self.get_pos();
 
         let dest = self.get_first_step().clone();
-        if (dest.x - current_pos.x).abs() < 1. && (dest.y - current_pos.y).abs() < 1. {
+        if (dest.x - current_pos.x).abs() < 5. && (dest.y - current_pos.y).abs() < 5. {
             self.pop_first_step();
             return;
         }
@@ -197,7 +197,7 @@ pub trait Pathfinding {
 
         let (dx, dy) = {
             // how much to move per frame
-            let mult = 100. * dt;
+            let mult = 300. * dt;
             (mult * move_dir.x, mult * move_dir.y)
         };
 

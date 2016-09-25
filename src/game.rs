@@ -105,29 +105,27 @@ impl<'a> Game<'a> {
 
         self.train.init(700., 0.8); // top speed, accel
 
-        // <test>
-        self.train.wagons.push(Wagon::new(&self.resources.tm, 2, 7));
-        self.train.wagons.push(Wagon::new(&self.resources.tm, 4, 5));
-        self.train.wagons.push(Wagon::new(&self.resources.tm, 6, 7));
+        let mut new_wag = Wagon::new(&self.resources.tm, 8, 5);
 
+        self.train.wagons.push(new_wag);
 
-//        self.train.wagons[1].tiles[6][2].sprite.set_texture(&self.resources.tm.get(TextureId::DoorSouth), false);
-//        self.train.wagons[1].tiles[6][2].is_solid = false;
-        self.train.wagons[0].set_position2f(TILE_SIZE_X as f32 * 14., TILE_SIZE_Y as f32 * 2.);
-        // </test>
+        for _ in 0..10 {
+            let mut new_wag = Wagon::new(&self.resources.tm, 8, 5);
+            self.train.wagons.last_mut().unwrap().connect(&mut new_wag, &self.resources.tm);
 
-        {
-            let (a, b) = self.train.wagons.split_at_mut(1);
-            a[0].connect(&mut b[0], &self.resources.tm);
-        }
-        {
-            let (a, b) = self.train.wagons.split_at_mut(2);
-            a[1].connect(&mut b[0], &self.resources.tm);
+            for w in self.train.wagons.iter_mut() {
+                w.move2f(9. * TILE_SIZE_X as f32, 0.);
+            }
+
+            self.train.wagons.push(new_wag);
         }
 
         self.train.rebuild_pfgrids();
 
-        self.actors = vec![Actor::new(&self.resources.tm.get(TextureId::Actor))];//, Actor::new(), Actor::new(), Actor::new()];
+        self.train.set_position2f(2. * TILE_SIZE_X as f32, 2. * TILE_SIZE_Y as f32);
+
+        self.actors = vec![Actor::new(&self.resources.tm.get(TextureId::Actor))];
+
         self.enemies = vec![Enemy::new(&self.resources.tm.get(TextureId::Enemy)),
                             Enemy::new(&self.resources.tm.get(TextureId::Enemy)),
                             Enemy::new(&self.resources.tm.get(TextureId::Enemy)),
@@ -472,6 +470,7 @@ impl<'a> Game<'a> {
                 }
 
                 for w in self.train.wagons.iter() {
+                    // culling boys
                     self.window.draw(w);
                 }
 
