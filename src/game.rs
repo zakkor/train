@@ -16,6 +16,7 @@ use world::*;
 use camera::*;
 use enemy::*;
 use pathfinding::*;
+use train::*;
 
 pub struct Game<'a> {
     resources: &'a Resources,
@@ -103,26 +104,24 @@ impl<'a> Game<'a> {
                                            &Vector2f::new(150., 180. + 80.)));
 
 
+        //--------
+
         self.train.init(700., 0.8); // top speed, accel
+        self.train.wagons.push(Wagon::new(&self.resources.tm, 8, 3));
 
-        let mut new_wag = Wagon::new(&self.resources.tm, 8, 5);
-
-        self.train.wagons.push(new_wag);
-
+        let mut y_size = 5;
         for _ in 0..10 {
-            let mut new_wag = Wagon::new(&self.resources.tm, 8, 5);
-            self.train.wagons.last_mut().unwrap().connect(&mut new_wag, &self.resources.tm);
+            let mut new_wag = Wagon::new(&self.resources.tm, 8, y_size);
+            y_size += 2;
 
-            for w in self.train.wagons.iter_mut() {
-                w.move2f(9. * TILE_SIZE_X as f32, 0.);
-            }
+            self.train.wagons.last_mut().unwrap().connect(&mut new_wag, &self.resources.tm);
 
             self.train.wagons.push(new_wag);
         }
-
         self.train.rebuild_pfgrids();
-
         self.train.set_position2f(2. * TILE_SIZE_X as f32, 2. * TILE_SIZE_Y as f32);
+
+        //---------
 
         self.actors = vec![Actor::new(&self.resources.tm.get(TextureId::Actor))];
 
@@ -471,7 +470,19 @@ impl<'a> Game<'a> {
 
                 for w in self.train.wagons.iter() {
                     // culling boys
-                    self.window.draw(w);
+                    let wagon_bound = FloatRect::new(w.get_origin().x,
+                                                     w.get_origin().y,
+                                                     (w.tiles[0].len() as u32 * TILE_SIZE_X) as f32,
+                                                     (w.tiles.len() as u32 * TILE_SIZE_Y) as f32);
+
+                    let view = &self.camera.game;
+                    let view_rect = FloatRect::new(view.get_center().x - view.get_size().x / 2.,
+                                                   view.get_center().y - view.get_size().y / 2.,
+                                                   view.get_size().x,
+                                                   view.get_size().y);
+                    if let Some(_) = view_rect.intersects(&wagon_bound) {
+                        self.window.draw(w);
+                    }
                 }
 
                 for a in self.actors.iter() {
