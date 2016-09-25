@@ -1,4 +1,6 @@
 use rand::Rng;
+use std::thread;
+use std::collections::VecDeque;
 
 use sfml::graphics::*;
 use sfml::system::*;
@@ -109,16 +111,18 @@ impl<'a> Game<'a> {
         self.train.init(700., 0.8); // top speed, accel
         self.train.wagons.push(Wagon::new(&self.resources.tm, 8, 3));
 
-        let mut y_size = 5;
-        for _ in 0..10 {
-            let mut new_wag = Wagon::new(&self.resources.tm, 8, y_size);
-            y_size += 2;
+        let mut y_size: i32 = 5;
+        for x in 0..10 {
+            let mut new_wag = Wagon::new(&self.resources.tm, 8, y_size as u32);
+            y_size += if x % 2 == 0 { 2 } else { -2 };
 
             self.train.wagons.last_mut().unwrap().connect(&mut new_wag, &self.resources.tm);
 
             self.train.wagons.push(new_wag);
         }
+
         self.train.rebuild_pfgrids();
+
         self.train.set_position2f(2. * TILE_SIZE_X as f32, 2. * TILE_SIZE_Y as f32);
 
         //---------
@@ -126,9 +130,11 @@ impl<'a> Game<'a> {
         self.actors = vec![Actor::new(&self.resources.tm.get(TextureId::Actor))];
 
         self.enemies = vec![Enemy::new(&self.resources.tm.get(TextureId::Enemy)),
-                            Enemy::new(&self.resources.tm.get(TextureId::Enemy)),
-                            Enemy::new(&self.resources.tm.get(TextureId::Enemy)),
                             Enemy::new(&self.resources.tm.get(TextureId::Enemy))];
+
+        for (x, e) in self.enemies.iter_mut().enumerate() {
+            e.sprite.move2f((x as u32 * TILE_SIZE_X) as f32, 0.);
+        }
 
         //        self.train.screech_snd = Some(self.music_manager.get_mut(MusicId::Screech));
         self.paused_text.set_font(&self.resources.fm.get(FontId::Joystix));
@@ -216,20 +222,21 @@ impl<'a> Game<'a> {
                                                                     pfgrids_must_be_rebuilt = true;
                                                                 } else {
                                                                     let (pfgrid_to_use, dest) = if actor.inside_wagon {
-                                                                        (&self.train.pfgrid_in, match *dir {
+                                                                        (self.train.pfgrid_in.clone(), match *dir {
                                                                             Direction::North => Vector2f::new(click_pos.x, click_pos.y + (TILE_SIZE_Y * 1) as f32),
                                                                             Direction::South => Vector2f::new(click_pos.x, click_pos.y - (TILE_SIZE_Y * 1) as f32),
                                                                             Direction::East => Vector2f::new(click_pos.x - (TILE_SIZE_X * 1) as f32, click_pos.y),
                                                                             Direction::West => Vector2f::new(click_pos.x + (TILE_SIZE_X * 1) as f32, click_pos.y),})
                                                                     } else {
-                                                                        (&self.train.pfgrid_out, match *dir {
+                                                                        (self.train.pfgrid_out.clone(), match *dir {
                                                                             _ => Vector2f::new(click_pos.x, click_pos.y),
                                                                         })
                                                                     };
 
 
-
-                                                                    actor.set_path(pfgrid_to_use, &train_origin, dest);
+                                                                    // TODO:
+                                                                    let start = actor.sprite.get_position();
+                                                                    actor.set_path(compute_path(start, pfgrid_to_use, train_origin, dest), train_origin);
                                                                 }
                                                                 break 'all;
                                                             }
@@ -259,9 +266,10 @@ impl<'a> Game<'a> {
                                         };
 
                                         let train_origin = self.train.get_origin();
-                                        actor.set_path(pfgrid_to_use,
-                                                       &train_origin,
-                                                       click_pos);
+                                        // TODO: 
+                                        // actor.set_path(pfgrid_to_use,
+                                        //                &train_origin,
+                                        //                click_pos);
                                     }
                                 }
                                 _ => {}
@@ -280,6 +288,16 @@ impl<'a> Game<'a> {
 
                             if let Key::Space = code {
                                 self.is_paused = !self.is_paused;
+
+                                // pause all musics
+
+                                for (_, music) in self.music_manager.resource_map.iter_mut() {
+                                    match music.get_status() {
+                                        SoundStatus::Playing => music.pause(),
+                                        SoundStatus::Paused => music.play(),
+                                        _ => {}
+                                    }
+                                }
                             }
 
                             if let Key::G = code {
@@ -393,12 +411,34 @@ impl<'a> Game<'a> {
                     }
 
                     let train_origin = self.train.get_origin();
-                    for e in self.enemies.iter_mut() {
-                        if self.train.current_speed > 0. {
-                            e.set_path(&self.train.pfgrid_out, &train_origin, self.train.wagons[0].tiles[0][2].sprite.get_position());
+                    let mut handles = vec![];
+                    let enemy_destination = self.train.wagons[0].tiles[0][2].sprite.get_position();
+
+                    if self.train.current_speed > 0. {
+                        for (idx, e) in self.enemies.iter_mut().enumerate() {
+                            let enemy_pos = e.sprite.get_position().clone();
+                            let pfgrid = self.train.pfgrid_out.clone();
+                            handles.push((idx, thread::spawn(move || compute_path(enemy_pos, pfgrid, train_origin, enemy_destination))));
+                            e.update_movement(&self.train.wagons, dt);
                         }
-                        e.update_movement(&self.train.wagons, dt);
+
+                        let train_origin = self.train.get_origin();
+                        for (idx, handle) in handles {
+                            match handle.join() {
+                                Ok(path) => {
+                                    self.enemies[idx].set_path(path, train_origin);
+                                }
+                                Err(_) => {} // dont care
+                            }
+                        }
                     }
+
+                    // for e in self.enemies.iter_mut() {
+                    //     if self.train.current_speed > 0. {
+                    //         e.set_path(&self.train.pfgrid_out, &train_origin, self.train.wagons[0].tiles[0][2].sprite.get_position());
+                    //     }
+                    //
+//                    }
 
                     self.world.update(dt * -self.train.current_speed);
 

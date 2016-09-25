@@ -5,6 +5,7 @@ use std::vec::IntoIter;
 use sfml::graphics::{FloatRect, Transformable};
 use wagon::{Wagon, TileType};
 use std::collections::VecDeque;
+use std::thread;
 
 #[derive(Copy, Clone)]
 pub struct PathfindingTile {
@@ -73,8 +74,8 @@ impl<'a> SearchProblem for GridSearch<'a> {
                 if !(i == 0 && k == 0)
                     // fucking corners
                     && !(i == -1 && k == -1) && !(i == -1 && k == 1) &&
-                    !(i == 1 && k == -1) &&
-                    !(i == 1 && k == 1) && x + i >= 0 && y + k >= 0 &&
+                    !(i == 1 && k == -1) && !(i == 1 && k == 1)
+                    && x + i >= 0 && y + k >= 0 &&
                     x + i < self.grid.grid.len() as i32 &&
                     y + k < self.grid.grid[0].len() as i32 &&
                     self.grid.grid.is_walkable(x + i, y + k) {
@@ -97,33 +98,18 @@ pub trait Pathfinding {
     fn move2f(&mut self, x: f32, y: f32);
     fn set_inside_wagon(&mut self, inside: bool);
 
-    fn set_path(&mut self, grid: &PathfindingGrid, train_pos: &Vector2f, click_pos: Vector2f) -> bool {
-        let start = (self.get_pos().x as i32 / TILE_SIZE_X as i32
-                     - (train_pos.x - grid.padding.2 as f32 * TILE_SIZE_X as f32) as i32 / TILE_SIZE_X as i32,
 
-                     self.get_pos().y as i32 / TILE_SIZE_Y as i32
-                     - (train_pos.y - grid.padding.0 as f32 * TILE_SIZE_X as f32) as i32 / TILE_SIZE_Y as i32);
-
-        let end = (click_pos.x as i32 / TILE_SIZE_X as i32 - (train_pos.x - 2. * 64.) as i32 / TILE_SIZE_X as i32,
-                   click_pos.y as i32 / TILE_SIZE_Y as i32 - (train_pos.y - 2. * 64.) as i32 / TILE_SIZE_Y as i32);
-
+    fn set_path(&mut self, path: VecDeque<(i32, i32)>, train_pos: Vector2f) {
         self.clear_steps();
 
-        let mut ts = GridSearch::new(grid, start, end);
+        let mut path = path.iter();
+        path.next();
 
-        if let Some(path) = astar(&mut ts) {
-            let mut path = path.iter();
-            path.next();
-
-            for step in path {
-                self.add_step(Vector2f::new((step.0 as f32 + (train_pos.y - 2. * 64.) / TILE_SIZE_X as f32) * TILE_SIZE_X as f32 +
-                                            TILE_SIZE_X as f32 / 2.,
-                                            (step.1 as f32 + (train_pos.y - 2. * 64.) / TILE_SIZE_Y as f32) * TILE_SIZE_Y as f32 +
-                                            TILE_SIZE_Y as f32 / 2.));
-            }
-            true
-        } else {
-            false
+        for step in path {
+            self.add_step(Vector2f::new((step.0 as f32 + (train_pos.y - 2. * 64.) / TILE_SIZE_X as f32) * TILE_SIZE_X as f32 +
+                                        TILE_SIZE_X as f32 / 2.,
+                                        (step.1 as f32 + (train_pos.y - 2. * 64.) / TILE_SIZE_Y as f32) * TILE_SIZE_Y as f32 +
+                                        TILE_SIZE_Y as f32 / 2.));
         }
     }
 
@@ -231,4 +217,21 @@ pub trait Pathfinding {
             }
         }
     }
+}
+
+
+pub fn compute_path(start: Vector2f, grid: PathfindingGrid, train_pos: Vector2f, click_pos: Vector2f) -> VecDeque<(i32, i32)> {
+    let start = (start.x as i32 / TILE_SIZE_X as i32
+                 - (train_pos.x - grid.padding.2 as f32 * TILE_SIZE_X as f32) as i32 / TILE_SIZE_X as i32,
+                 start.y as i32 / TILE_SIZE_Y as i32
+                 - (train_pos.y - grid.padding.0 as f32 * TILE_SIZE_X as f32) as i32 / TILE_SIZE_Y as i32);
+
+    let end = (click_pos.x as i32 / TILE_SIZE_X as i32 - (train_pos.x - 2. * 64.) as i32 / TILE_SIZE_X as i32,
+               click_pos.y as i32 / TILE_SIZE_Y as i32 - (train_pos.y - 2. * 64.) as i32 / TILE_SIZE_Y as i32);
+
+    //        self.clear_steps();
+
+    let mut ts = GridSearch::new(&grid, start, end);
+
+    astar(&mut ts).unwrap()
 }

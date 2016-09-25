@@ -34,7 +34,7 @@ impl Resource for SoundBuffer {
 }
 
 pub struct ResourceManager<I, R> {
-    resource_map: HashMap<I, R>,
+    pub resource_map: HashMap<I, R>,
 }
 
 impl<I: Eq + Hash, R: Resource> ResourceManager<I, R> {
