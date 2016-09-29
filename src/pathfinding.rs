@@ -220,7 +220,7 @@ pub trait Pathfinding {
 }
 
 
-pub fn compute_path(start: Vector2f, grid: PathfindingGrid, train_pos: Vector2f, click_pos: Vector2f) -> VecDeque<(i32, i32)> {
+pub fn compute_path(start: Vector2f, grid: PathfindingGrid, train_pos: Vector2f, click_pos: Vector2f) -> Option<VecDeque<(i32, i32)>> {
     let start = (start.x as i32 / TILE_SIZE_X as i32
                  - (train_pos.x - grid.padding.2 as f32 * TILE_SIZE_X as f32) as i32 / TILE_SIZE_X as i32,
                  start.y as i32 / TILE_SIZE_Y as i32
@@ -233,5 +233,5 @@ pub fn compute_path(start: Vector2f, grid: PathfindingGrid, train_pos: Vector2f,
 
     let mut ts = GridSearch::new(&grid, start, end);
 
-    astar(&mut ts).unwrap()
+    astar(&mut ts)
 }

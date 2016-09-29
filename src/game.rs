@@ -127,7 +127,11 @@ impl<'a> Game<'a> {
 
         //---------
 
-        self.actors = vec![Actor::new(&self.resources.tm.get(TextureId::Actor))];
+        self.actors = vec![Actor::new(&self.resources.tm.get(TextureId::Actor)),
+                           Actor::new(&self.resources.tm.get(TextureId::Actor)),
+                           Actor::new(&self.resources.tm.get(TextureId::Actor)),
+                           Actor::new(&self.resources.tm.get(TextureId::Actor)),
+                           Actor::new(&self.resources.tm.get(TextureId::Actor))];
 
         self.enemies = vec![Enemy::new(&self.resources.tm.get(TextureId::Enemy)),
                             Enemy::new(&self.resources.tm.get(TextureId::Enemy))];
@@ -162,10 +166,9 @@ impl<'a> Game<'a> {
                         event::MouseMoved { x, y, .. } => {
                             let coords = self.window
                                 .map_pixel_to_coords_current_view(&Vector2i::new(x, y));
-                            if let Some(_) = self.selected_actor {
-                                self.tile_selection.set_position2f(((TILE_SIZE_X as u32) * (coords.x as u32 / TILE_SIZE_X)) as f32,
-                                                                   ((TILE_SIZE_Y as u32) * (coords.y as u32 / TILE_SIZE_Y)) as f32);
-                            }
+
+                            self.tile_selection.set_position2f(((TILE_SIZE_X as u32) * (coords.x as u32 / TILE_SIZE_X)) as f32,
+                                                               ((TILE_SIZE_Y as u32) * (coords.y as u32 / TILE_SIZE_Y)) as f32);
                         }
                         event::MouseButtonPressed { button, .. } => {
                             match button {
@@ -236,7 +239,10 @@ impl<'a> Game<'a> {
 
                                                                     // TODO:
                                                                     let start = actor.sprite.get_position();
-                                                                    actor.set_path(compute_path(start, pfgrid_to_use, train_origin, dest), train_origin);
+                                                                    let maybe_path = compute_path(start, pfgrid_to_use, train_origin, dest);
+                                                                    if let Some(path) = maybe_path {
+                                                                        actor.set_path(path, train_origin);
+                                                                    }
                                                                 }
                                                                 break 'all;
                                                             }
@@ -425,8 +431,11 @@ impl<'a> Game<'a> {
                         let train_origin = self.train.get_origin();
                         for (idx, handle) in handles {
                             match handle.join() {
-                                Ok(path) => {
+                                Ok(Some(path)) => {
                                     self.enemies[idx].set_path(path, train_origin);
+                                }
+                                Ok(None) => {
+                                    println!("No path available!");
                                 }
                                 Err(_) => {} // dont care
                             }
