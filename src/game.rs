@@ -21,6 +21,7 @@ use camera::*;
 use enemy::*;
 use pathfinding::*;
 use train::*;
+use std::sync::mpsc::*;
 
 pub struct Game<'a> {
     resources: &'a Resources,
@@ -43,6 +44,7 @@ pub struct Game<'a> {
     selection_rect: RectangleShape<'a>,
     selecting: bool,
     handles: Vec<(usize, JoinHandle<Option<VecDeque<(i32, i32)>>>)>,
+    channel: (Sender<usize>, Receiver<usize>),
 }
 
 impl<'a> Game<'a> {
@@ -91,7 +93,8 @@ impl<'a> Game<'a> {
             is_paused: false,
             selection_rect: selection_rect,
             selecting: false,
-            handles: vec![]
+            handles: vec![],
+            channel: channel(),
         }
     }
 
@@ -282,7 +285,7 @@ impl<'a> Game<'a> {
                                                                               .get_mouse_position());
                                         let train_origin = self.train.get_origin();
 
-                                        for sa in self.selected_actors.iter() {
+                                        for (idx, sa) in self.selected_actors.iter().enumerate() {
                                             let mut actor = &mut self.actors[*sa];
 
                                             let pfgrid_to_use = if actor.inside_wagon {
@@ -292,42 +295,20 @@ impl<'a> Game<'a> {
                                             };
 
                                             let start = actor.sprite.get_position();
-                                            let train_origin = self.train.get_origin();
+                                            let send = self.channel.0.clone();
+                                            self.handles.push((idx, thread::spawn(move || {
+                                                let path = compute_path(start,
+                                                             pfgrid_to_use,
+                                                             train_origin,
+                                                             click_pos);
+                                                send.send(idx);
+                                                path
+                                            })));
 
-                                            // let (tx, rx) = mpsc::channel();
 
-                                            // for (idx, e) in self.enemies.iter_mut().enumerate() {
-                                            //     let enemy_pos = e.sprite.get_position().clone();
-
-                                            //     let pfgrid = self.train.pfgrid_out.clone();
-
-                                            //     let tx = tx.clone();
-
-                                            //     self.handles.push((idx, thread::spawn(move || {
-                                            //         let path_result = compute_path(enemy_pos,
-                                            //                                        pfgrid,
-                                            //                                        train_origin,
-                                            //                                        enemy_destination);
-                                            //         tx.send(idx).unwrap();
-                                            //         path_result
-                                            //     })));
-                                            //     e.update_movement(&self.train.wagons, dt);
+                                            // if let Some(path) = maybe_path {
+                                            //     actor.set_path(path, train_origin);
                                             // }
-
-                                            // let train_origin = self.train.get_origin();
-
-                                            // let all_threads_finished = true;
-                                            // for _ in 0..self.enemies.len() {
-                                            //     let idx = rx.recv().unwrap();
-                                            //     println!("{} started", idx);
-                                            //     self.enemies[idx].set_path(self.handles.swap_remove(0).1.join().unwrap().unwrap(),
-                                            //                                train_origin);
-                                            //     println!("{} finished", idx);
-                                            // }
-                                            let maybe_path = compute_path(start, pfgrid_to_use, train_origin, click_pos);
-                                            if let Some(path) = maybe_path {
-                                                actor.set_path(path, train_origin);
-                                            }
                                         }
                                     }
                                 }
@@ -337,8 +318,26 @@ impl<'a> Game<'a> {
                         event::MouseButtonReleased { button, .. } => {
                             match button {
                                 MouseButton::Left => {
-                                    self.selecting = false;
-                                    println!("selection over!");
+                                    if self.selecting {
+                                        self.selecting = false;
+                                        println!("selection over!");
+
+                                        // select actor under cursor
+                                        let mut actors_to_unselect: Vec<usize> = vec![];
+                                        for (i, a) in self.actors.iter_mut().enumerate() {
+                                            if a.sprite
+                                                .get_global_bounds()
+                                                .intersects(&self.selection_rect.get_global_bounds()) != None {
+                                                    // TODO:
+                                                    //                                                actor_to_unselect = self.selected_actor;
+                                                    if !self.selected_actors.contains(&i) {
+                                                        a.sprite.set_color(&Color::green());
+                                                        self.selected_actors.push(i);
+                                                    }
+                                                }
+                                        }
+                                    }
+
                                 }
                                 _ => {}
                             }
@@ -471,21 +470,13 @@ impl<'a> Game<'a> {
         let time = self.clock.restart();
         match *self.state_stack.top().unwrap() {
             StateType::Playing => {
-                if self.selecting {
-                    // select actor under cursor
-                    let mut actors_to_unselect: Vec<usize> = vec![];
-                    for (i, a) in self.actors.iter_mut().enumerate() {
-                        if a.sprite
-                            .get_global_bounds()
-                            .intersects(&self.selection_rect.get_global_bounds()) != None {
-                                // TODO:
-                                //                                                actor_to_unselect = self.selected_actor;
-                                a.sprite.set_color(&Color::green());
-                                self.selected_actors.push(i);
-                            }
-                    }
+                let train_origin = self.train.get_origin();
+                for recv in self.channel.1.try_iter() {
+                    println!("recv val {}, sa len: {}", recv, self.selected_actors.len());
+                    let true_index = self.handles.iter().position(|ref x| x.0 == recv).unwrap();
+                    self.actors[self.selected_actors[recv]].set_path(&mut self.handles.remove(true_index).1.join().unwrap().unwrap(),
+                                                                     train_origin);
                 }
-
 
                 if !self.is_paused {
                     let dt = time.as_seconds();
@@ -501,36 +492,38 @@ impl<'a> Game<'a> {
                         let enemy_destination = self.train.wagons[0].tiles[0][2].sprite.get_position();
 
 
-                        let (tx, rx) = mpsc::channel();
+                        // let (tx, rx) = mpsc::channel();
 
                         for (idx, e) in self.enemies.iter_mut().enumerate() {
-                            let enemy_pos = e.sprite.get_position().clone();
 
-                            let pfgrid = self.train.pfgrid_out.clone();
+                            // TODO: WRONG!
+                        //     let enemy_pos = e.sprite.get_position().clone();
 
-                            let tx = tx.clone();
+                        //     let pfgrid = self.train.pfgrid_out.clone();
 
-                            self.handles.push((idx, thread::spawn(move || {
-                                let path_result = compute_path(enemy_pos,
-                                                               pfgrid,
-                                                               train_origin,
-                                                               enemy_destination);
-                                tx.send(idx).unwrap();
-                                path_result
-                            })));
+                        //     let tx = tx.clone();
+
+                        //     self.handles.push((idx, thread::spawn(move || {
+                        //         let path_result = compute_path(enemy_pos,
+                        //                                        pfgrid,
+                        //                                        train_origin,
+                        //                                        enemy_destination);
+                        //         tx.send(idx).unwrap();
+                        //         path_result
+                        //     })));
                             e.update_movement(&self.train.wagons, dt);
                         }
 
-                        let train_origin = self.train.get_origin();
-
-                        let all_threads_finished = true;
-                        for _ in 0..self.enemies.len() {
-                            let idx = rx.recv().unwrap();
-                            println!("{} started", idx);
-                            self.enemies[idx].set_path(self.handles.swap_remove(0).1.join().unwrap().unwrap(),
-                                                       train_origin);
-                            println!("{} finished", idx);
-                        }
+                        // let train_origin = self.train.get_origin();
+                        // TODO: WRONG!
+                        // let all_threads_finished = true;
+                        // for _ in 0..self.enemies.len() {
+                        //     let idx = rx.recv().unwrap();
+                        //     println!("{} started", idx);
+                        //     self.enemies[idx].set_path(self.handles.swap_remove(0).1.join().unwrap().unwrap(),
+                        //                                train_origin);
+                        //     println!("{} finished", idx);
+                        // }
 
                         // for &mut (idx, ref handle) in self.handles.iter_mut() {
                         //     match handle.join() {

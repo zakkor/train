@@ -99,7 +99,7 @@ pub trait Pathfinding {
     fn set_inside_wagon(&mut self, inside: bool);
 
 
-    fn set_path(&mut self, path: VecDeque<(i32, i32)>, train_pos: Vector2f) {
+    fn set_path(&mut self, path: &mut VecDeque<(i32, i32)>, train_pos: Vector2f) {
         self.clear_steps();
 
         let mut path = path.iter();

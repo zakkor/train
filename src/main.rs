@@ -1,6 +1,7 @@
 #![allow(dead_code)]
 #![allow(unused_imports)]
 #![feature(inclusive_range_syntax)]
+#![feature(receiver_try_iter)]
 
 extern crate sfml;
 extern crate rand;
