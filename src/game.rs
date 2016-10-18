@@ -1,6 +1,8 @@
 use rand::Rng;
+use std::thread::JoinHandle;
 use std::thread;
 use std::collections::VecDeque;
+use std::sync::mpsc;
 
 use sfml::graphics::*;
 use sfml::system::*;
@@ -27,16 +29,20 @@ pub struct Game<'a> {
     state_stack: StateStack,
     pm: ParticleManager<'a>,
     clock: Clock,
+    pf_clock: Clock,
     train: Train<'a>,
     actors: Vec<Actor<'a>>,
     enemies: Vec<Enemy<'a>>,
-    selected_actor: Option<usize>,
+    selected_actors: Vec<usize>,
     menu: Menu<'a>,
     world: World<'a>,
     camera: Camera,
     tile_selection: RectangleShape<'a>,
     paused_text: Text<'a>,
-    is_paused: bool
+    is_paused: bool,
+    selection_rect: RectangleShape<'a>,
+    selecting: bool,
+    handles: Vec<(usize, JoinHandle<Option<VecDeque<(i32, i32)>>>)>,
 }
 
 impl<'a> Game<'a> {
@@ -58,6 +64,10 @@ impl<'a> Game<'a> {
         tile_selection.set_size2f(TILE_SIZE_X as f32, TILE_SIZE_Y as f32);
         tile_selection.set_fill_color(&Color::new_rgba(255, 255, 0, 60));
 
+        let mut selection_rect = RectangleShape::new().unwrap();
+        selection_rect.set_size2f(0., 0.);
+        selection_rect.set_fill_color(&Color::new_rgba(0, 255, 0, 150));
+
         Game {
             resources: resources,
             music_manager: music_manager,
@@ -65,10 +75,11 @@ impl<'a> Game<'a> {
             state_stack: state_stack,
             pm: ParticleManager::new(),
             clock: Clock::new(),
+            pf_clock: Clock::new(),
             train: Train::new(),
             actors: vec![],
             enemies: vec![],
-            selected_actor: None,
+            selected_actors: vec![],
             menu: Menu { buttons: vec![] },
             world: World {
                 bgs: vec![],
@@ -78,6 +89,9 @@ impl<'a> Game<'a> {
             tile_selection: tile_selection,
             paused_text: Text::new().unwrap(),
             is_paused: false,
+            selection_rect: selection_rect,
+            selecting: false,
+            handles: vec![]
         }
     }
 
@@ -113,7 +127,7 @@ impl<'a> Game<'a> {
 
         let mut y_size: i32 = 5;
         for x in 0..10 {
-            let mut new_wag = Wagon::new(&self.resources.tm, 8, y_size as u32);
+            let mut new_wag = Wagon::new(&self.resources.tm, 8, 3);
             y_size += if x % 2 == 0 { 2 } else { -2 };
 
             self.train.wagons.last_mut().unwrap().connect(&mut new_wag, &self.resources.tm);
@@ -132,6 +146,12 @@ impl<'a> Game<'a> {
                            Actor::new(&self.resources.tm.get(TextureId::Actor)),
                            Actor::new(&self.resources.tm.get(TextureId::Actor)),
                            Actor::new(&self.resources.tm.get(TextureId::Actor))];
+
+        let mut offset = 0.;
+        for a in self.actors.iter_mut() {
+            a.sprite.move2f(offset, offset);
+            offset += 64.;
+        }
 
         self.enemies = vec![Enemy::new(&self.resources.tm.get(TextureId::Enemy)),
                             Enemy::new(&self.resources.tm.get(TextureId::Enemy))];
@@ -169,114 +189,156 @@ impl<'a> Game<'a> {
 
                             self.tile_selection.set_position2f(((TILE_SIZE_X as u32) * (coords.x as u32 / TILE_SIZE_X)) as f32,
                                                                ((TILE_SIZE_Y as u32) * (coords.y as u32 / TILE_SIZE_Y)) as f32);
+
+                            if self.selecting {
+                                let rect_pos = self.selection_rect.get_position();
+                                self.selection_rect.set_size2f(-(rect_pos.x - x as f32), -(rect_pos.y - y as f32));
+                            }
                         }
                         event::MouseButtonPressed { button, .. } => {
                             match button {
                                 MouseButton::Left => {
-                                    // select actor under cursor
-                                    let mut actor_to_unselect: Option<usize> = None;
-                                    for (i, a) in self.actors.iter_mut().enumerate() {
-                                        let coords = self.window
-                                            .map_pixel_to_coords_current_view(&self.window
-                                                .get_mouse_position());
-                                        if a.sprite
-                                            .get_global_bounds()
-                                            .contains(coords.to_vector2f()) {
-                                                actor_to_unselect = self.selected_actor;
-                                                a.sprite.set_color(&Color::green());
-                                                self.selected_actor = Some(i);
-                                                break;
-                                        }
-                                    }
-                                    if let Some(a) = actor_to_unselect {
-                                        self.actors[a].sprite.set_color(&Color::white());
-                                    }
-
-                                    if let Some(sa) = self.selected_actor {
-                                        let click_pos = self.window
-                                            .map_pixel_to_coords_current_view(&self.window
-                                                                              .get_mouse_position());
-                                        // open/close door
-                                        let mut pfgrids_must_be_rebuilt = false;
-                                        let train_origin = self.train.get_origin();
-                                        'all: for w in self.train.wagons.iter_mut() {
-                                            for t in w.tiles.iter_mut() {
-                                                for t in t.iter_mut() {
-                                                    if let TileType::Door(ref dir) = t.tile_type {
-                                                        let actor = &mut self.actors[sa];
-
-                                                        if t.sprite.get_global_bounds().contains(click_pos) {
-                                                            if let Some(n) = actor.number_of_steps_to(&self.train.pfgrid_all, &train_origin, click_pos) {
-                                                                let required_n = if actor.inside_wagon {
-                                                                    1
-                                                                } else {
-                                                                    0
-                                                                };
-
-                                                                if n == required_n {
-                                                                    if t.is_solid {
-                                                                        // open it
-                                                                        t.is_solid = false;
-                                                                        t.sprite.set_texture(&self.resources.tm.get(TextureId::DoorOpen(dir.clone())), false);
-                                                                    } else {
-                                                                        t.is_solid = true;
-                                                                        t.sprite.set_texture(&self.resources.tm.get(TextureId::DoorClosed(dir.clone())), false);
-                                                                    }
-                                                                    pfgrids_must_be_rebuilt = true;
-                                                                } else {
-                                                                    let (pfgrid_to_use, dest) = if actor.inside_wagon {
-                                                                        (self.train.pfgrid_in.clone(), match *dir {
-                                                                            Direction::North => Vector2f::new(click_pos.x, click_pos.y + (TILE_SIZE_Y * 1) as f32),
-                                                                            Direction::South => Vector2f::new(click_pos.x, click_pos.y - (TILE_SIZE_Y * 1) as f32),
-                                                                            Direction::East => Vector2f::new(click_pos.x - (TILE_SIZE_X * 1) as f32, click_pos.y),
-                                                                            Direction::West => Vector2f::new(click_pos.x + (TILE_SIZE_X * 1) as f32, click_pos.y),})
-                                                                    } else {
-                                                                        (self.train.pfgrid_out.clone(), match *dir {
-                                                                            _ => Vector2f::new(click_pos.x, click_pos.y),
-                                                                        })
-                                                                    };
+                                    self.selecting = true;
+                                    self.selection_rect.set_size2f(0., 0.);
+                                    let coords = self.window
+                                        .map_pixel_to_coords_current_view(&self.window
+                                                                          .get_mouse_position());
+                                    self.selection_rect.set_position(&coords);
 
 
-                                                                    // TODO:
-                                                                    let start = actor.sprite.get_position();
-                                                                    let maybe_path = compute_path(start, pfgrid_to_use, train_origin, dest);
-                                                                    if let Some(path) = maybe_path {
-                                                                        actor.set_path(path, train_origin);
-                                                                    }
-                                                                }
-                                                                break 'all;
-                                                            }
-                                                        }
-                                                    }
-                                                }
-                                            }
-                                        }
-                                        if pfgrids_must_be_rebuilt {
-                                            self.train.rebuild_pfgrids();
-                                        }
-                                    }
+                                    // if let Some(a) = actor_to_unselect {
+                                    //     self.actors[a].sprite.set_color(&Color::white());
+                                    // }
+
+                                    // if let Some(sa) = self.selected_actor {
+                                    //     let click_pos = self.window
+                                    //         .map_pixel_to_coords_current_view(&self.window
+                                    //                                           .get_mouse_position());
+                                    //     // open/close door
+                                    //     let mut pfgrids_must_be_rebuilt = false;
+                                    //     let train_origin = self.train.get_origin();
+                                    //     'all: for w in self.train.wagons.iter_mut() {
+                                    //         for t in w.tiles.iter_mut() {
+                                    //             for t in t.iter_mut() {
+                                    //                 if let TileType::Door(ref dir) = t.tile_type {
+                                    //                     let actor = &mut self.actors[sa];
+
+                                    //                     if t.sprite.get_global_bounds().contains(click_pos) {
+                                    //                         if let Some(n) = actor.number_of_steps_to(&self.train.pfgrid_all, &train_origin, click_pos) {
+                                    //                             let required_n = if actor.inside_wagon {
+                                    //                                 1
+                                    //                             } else {
+                                    //                                 0
+                                    //                             };
+
+                                    //                             if n == required_n {
+                                    //                                 if t.is_solid {
+                                    //                                     // open it
+                                    //                                     t.is_solid = false;
+                                    //                                     t.sprite.set_texture(&self.resources.tm.get(TextureId::DoorOpen(dir.clone())), false);
+                                    //                                 } else {
+                                    //                                     t.is_solid = true;
+                                    //                                     t.sprite.set_texture(&self.resources.tm.get(TextureId::DoorClosed(dir.clone())), false);
+                                    //                                 }
+                                    //                                 pfgrids_must_be_rebuilt = true;
+                                    //                             } else {
+                                    //                                 let (pfgrid_to_use, dest) = if actor.inside_wagon {
+                                    //                                     (self.train.pfgrid_in.clone(), match *dir {
+                                    //                                         Direction::North => Vector2f::new(click_pos.x, click_pos.y + (TILE_SIZE_Y * 1) as f32),
+                                    //                                         Direction::South => Vector2f::new(click_pos.x, click_pos.y - (TILE_SIZE_Y * 1) as f32),
+                                    //                                         Direction::East => Vector2f::new(click_pos.x - (TILE_SIZE_X * 1) as f32, click_pos.y),
+                                    //                                         Direction::West => Vector2f::new(click_pos.x + (TILE_SIZE_X * 1) as f32, click_pos.y),})
+                                    //                                 } else {
+                                    //                                     (self.train.pfgrid_out.clone(), match *dir {
+                                    //                                         _ => Vector2f::new(click_pos.x, click_pos.y),
+                                    //                                     })
+                                    //                                 };
+
+
+                                    //                                 // TODO:
+                                    //                                 let start = actor.sprite.get_position();
+                                    //                                 let maybe_path = compute_path(start, pfgrid_to_use, train_origin, dest);
+                                    //                                 if let Some(path) = maybe_path {
+                                    //                                     actor.set_path(path, train_origin);
+                                    //                                 }
+                                    //                             }
+                                    //                             break 'all;
+                                    //                         }
+                                    //                     }
+                                    //                 }
+                                    //             }
+                                    //         }
+                                    //     }
+                                    //     if pfgrids_must_be_rebuilt {
+                                    //         self.train.rebuild_pfgrids();
+                                    //     }
+                                    // }
                                 }
                                 MouseButton::Right => {
-                                    if let Some(selected_actor) = self.selected_actor {
+                                    if !self.selected_actors.is_empty() {
                                         println!("{:?}", self.train.total_size);
                                         let click_pos = self.window
                                             .map_pixel_to_coords_current_view(&self.window
                                                                               .get_mouse_position());
-
-                                        let mut actor = &mut self.actors[selected_actor];
-
-                                        let pfgrid_to_use = if actor.inside_wagon {
-                                            &self.train.pfgrid_in
-                                        } else {
-                                            &self.train.pfgrid_out
-                                        };
-
                                         let train_origin = self.train.get_origin();
-                                        // TODO: 
-                                        // actor.set_path(pfgrid_to_use,
-                                        //                &train_origin,
-                                        //                click_pos);
+
+                                        for sa in self.selected_actors.iter() {
+                                            let mut actor = &mut self.actors[*sa];
+
+                                            let pfgrid_to_use = if actor.inside_wagon {
+                                                self.train.pfgrid_in.clone()
+                                            } else {
+                                                self.train.pfgrid_out.clone()
+                                            };
+
+                                            let start = actor.sprite.get_position();
+                                            let train_origin = self.train.get_origin();
+
+                                            // let (tx, rx) = mpsc::channel();
+
+                                            // for (idx, e) in self.enemies.iter_mut().enumerate() {
+                                            //     let enemy_pos = e.sprite.get_position().clone();
+
+                                            //     let pfgrid = self.train.pfgrid_out.clone();
+
+                                            //     let tx = tx.clone();
+
+                                            //     self.handles.push((idx, thread::spawn(move || {
+                                            //         let path_result = compute_path(enemy_pos,
+                                            //                                        pfgrid,
+                                            //                                        train_origin,
+                                            //                                        enemy_destination);
+                                            //         tx.send(idx).unwrap();
+                                            //         path_result
+                                            //     })));
+                                            //     e.update_movement(&self.train.wagons, dt);
+                                            // }
+
+                                            // let train_origin = self.train.get_origin();
+
+                                            // let all_threads_finished = true;
+                                            // for _ in 0..self.enemies.len() {
+                                            //     let idx = rx.recv().unwrap();
+                                            //     println!("{} started", idx);
+                                            //     self.enemies[idx].set_path(self.handles.swap_remove(0).1.join().unwrap().unwrap(),
+                                            //                                train_origin);
+                                            //     println!("{} finished", idx);
+                                            // }
+                                            let maybe_path = compute_path(start, pfgrid_to_use, train_origin, click_pos);
+                                            if let Some(path) = maybe_path {
+                                                actor.set_path(path, train_origin);
+                                            }
+                                        }
                                     }
+                                }
+                                _ => {}
+                            }
+                        }
+                        event::MouseButtonReleased { button, .. } => {
+                            match button {
+                                MouseButton::Left => {
+                                    self.selecting = false;
+                                    println!("selection over!");
                                 }
                                 _ => {}
                             }
@@ -409,6 +471,22 @@ impl<'a> Game<'a> {
         let time = self.clock.restart();
         match *self.state_stack.top().unwrap() {
             StateType::Playing => {
+                if self.selecting {
+                    // select actor under cursor
+                    let mut actors_to_unselect: Vec<usize> = vec![];
+                    for (i, a) in self.actors.iter_mut().enumerate() {
+                        if a.sprite
+                            .get_global_bounds()
+                            .intersects(&self.selection_rect.get_global_bounds()) != None {
+                                // TODO:
+                                //                                                actor_to_unselect = self.selected_actor;
+                                a.sprite.set_color(&Color::green());
+                                self.selected_actors.push(i);
+                            }
+                    }
+                }
+
+
                 if !self.is_paused {
                     let dt = time.as_seconds();
 
@@ -416,31 +494,59 @@ impl<'a> Game<'a> {
                         a.update_movement(&self.train.wagons, dt);
                     }
 
-                    let train_origin = self.train.get_origin();
-                    let mut handles = vec![];
-                    let enemy_destination = self.train.wagons[0].tiles[0][2].sprite.get_position();
+                    let time_elapsed = self.pf_clock.get_elapsed_time();
+                    if time_elapsed.as_seconds() >= 1. {
+                        let train_origin = self.train.get_origin();
 
-                    if self.train.current_speed > 0. {
+                        let enemy_destination = self.train.wagons[0].tiles[0][2].sprite.get_position();
+
+
+                        let (tx, rx) = mpsc::channel();
+
                         for (idx, e) in self.enemies.iter_mut().enumerate() {
                             let enemy_pos = e.sprite.get_position().clone();
+
                             let pfgrid = self.train.pfgrid_out.clone();
-                            handles.push((idx, thread::spawn(move || compute_path(enemy_pos, pfgrid, train_origin, enemy_destination))));
+
+                            let tx = tx.clone();
+
+                            self.handles.push((idx, thread::spawn(move || {
+                                let path_result = compute_path(enemy_pos,
+                                                               pfgrid,
+                                                               train_origin,
+                                                               enemy_destination);
+                                tx.send(idx).unwrap();
+                                path_result
+                            })));
                             e.update_movement(&self.train.wagons, dt);
                         }
 
                         let train_origin = self.train.get_origin();
-                        for (idx, handle) in handles {
-                            match handle.join() {
-                                Ok(Some(path)) => {
-                                    self.enemies[idx].set_path(path, train_origin);
-                                }
-                                Ok(None) => {
-                                    println!("No path available!");
-                                }
-                                Err(_) => {} // dont care
-                            }
+
+                        let all_threads_finished = true;
+                        for _ in 0..self.enemies.len() {
+                            let idx = rx.recv().unwrap();
+                            println!("{} started", idx);
+                            self.enemies[idx].set_path(self.handles.swap_remove(0).1.join().unwrap().unwrap(),
+                                                       train_origin);
+                            println!("{} finished", idx);
                         }
+
+                        // for &mut (idx, ref handle) in self.handles.iter_mut() {
+                        //     match handle.join() {
+                        //         Ok(Some(path)) => {
+                        //             self.enemies[idx].set_path(path, train_origin);
+                        //         }
+                        //         Ok(None) => {
+                        //             println!("No path available!");
+                        //         }
+                        //         Err(_) => {} // dont care
+                        //     }
+                        // }
                     }
+
+
+
 
                     // for e in self.enemies.iter_mut() {
                     //     if self.train.current_speed > 0. {
@@ -452,7 +558,6 @@ impl<'a> Game<'a> {
                     self.world.update(dt * -self.train.current_speed);
 
                     self.train.update();
-
 
                     // sounds
                     if self.train.current_speed > 0. {
@@ -485,14 +590,14 @@ impl<'a> Game<'a> {
 
                     for a in self.actors.iter_mut() {
                         if !a.inside_wagon {
-                            // add collision checking to this (refactor what is above into a checking function)
+                            //TODO: add collision checking to this (refactor what is above into a checking function)
                             a.sprite.move2f(dt * -self.train.current_speed, 0.);
                         }
                     }
 
                     for e in self.enemies.iter_mut() {
                         if !e.inside_wagon {
-                            // add collision checking to this (refactor what is above into a checking function)
+                            //TODO add collision checking to this (refactor what is above into a checking function)
                             e.sprite.move2f(dt * -self.train.current_speed, 0.);
                         }
                     }
@@ -552,6 +657,10 @@ impl<'a> Game<'a> {
                     self.window.draw(&e.sprite);
                 }
 
+                if self.selecting {
+                    self.window.draw(&self.selection_rect);
+                }
+
                 // if let Some(selected_actor) = self.selected_actor {
                 //     for (i, t) in if self.actors[selected_actor].inside_wagon {
                 //         self.train.pfgrid_in.grid.iter().enumerate()
@@ -576,8 +685,9 @@ impl<'a> Game<'a> {
                 //         }
                 //     }
                 // }
-
-                self.window.draw(&self.tile_selection);
+                if !self.selected_actors.is_empty() {
+                    self.window.draw(&self.tile_selection);
+                }
 
                 if self.is_paused {
                     // ui view

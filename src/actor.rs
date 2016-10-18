@@ -19,7 +19,7 @@ impl<'a> Actor<'a> {
         let mut sprite = Sprite::new().unwrap();
 //        sprite.set_size2f(25., 25.);
         sprite.set_color(&Color::red());
-        sprite.set_position2f(1280. / 2. - 100., 500.);
+        sprite.set_position2f(1280. / 2. - 400., 215.);
         sprite.set_origin2f(25. / 2., 25. / 2.);
         sprite.set_texture(texture, true);
 
