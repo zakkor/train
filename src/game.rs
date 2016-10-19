@@ -23,6 +23,40 @@ use pathfinding::*;
 use train::*;
 use std::sync::mpsc::*;
 
+pub struct NPCManager<T> {
+    npcs: Vec<T>,
+    channel: (Sender<usize>, Receiver<usize>),
+}
+
+pub struct ActorManager<'a> {
+    actors: Vec<Actor<'a>>,
+    selected: Vec<usize>,
+    selection_rect: RectangleShape<'a>,
+    is_selecting: bool,
+    channel: (Sender<usize>, Receiver<usize>),
+}
+
+impl<'a> ActorManager<'a> {
+    pub fn new() -> Self {
+        let mut selection_rect = RectangleShape::new().unwrap();
+        selection_rect.set_size2f(0., 0.);
+        selection_rect.set_fill_color(&Color::new_rgba(0, 255, 0, 150));
+
+        ActorManager {
+            actors: vec![],
+            selected: vec![],
+            selection_rect: selection_rect,
+            is_selecting: false,
+            channel: channel(),
+        }
+    }
+}
+
+pub struct EnemyManager<'a> {
+    enemies: Vec<Enemy<'a>>,
+    channel: (Sender<usize>, Receiver<usize>),
+}
+
 pub struct Game<'a> {
     resources: &'a Resources,
     music_manager: &'a mut MusicManager,
@@ -45,6 +79,8 @@ pub struct Game<'a> {
     selecting: bool,
     handles: Vec<(usize, JoinHandle<Option<VecDeque<(i32, i32)>>>)>,
     channel: (Sender<usize>, Receiver<usize>),
+
+    am: ActorManager<'a>,
 }
 
 impl<'a> Game<'a> {
@@ -95,6 +131,7 @@ impl<'a> Game<'a> {
             selecting: false,
             handles: vec![],
             channel: channel(),
+            am: ActorManager::new(),
         }
     }
 
@@ -144,11 +181,11 @@ impl<'a> Game<'a> {
 
         //---------
 
-        self.actors = vec![Actor::new(&self.resources.tm.get(TextureId::Actor)),
-                           Actor::new(&self.resources.tm.get(TextureId::Actor)),
-                           Actor::new(&self.resources.tm.get(TextureId::Actor)),
-                           Actor::new(&self.resources.tm.get(TextureId::Actor)),
-                           Actor::new(&self.resources.tm.get(TextureId::Actor))];
+        self.actors = vec![Actor::new(&self.resources.tm.get(TextureId::Char_0_nm)),
+                           Actor::new(&self.resources.tm.get(TextureId::Char_0_nm)),
+                           Actor::new(&self.resources.tm.get(TextureId::Char_0_nm)),
+                           Actor::new(&self.resources.tm.get(TextureId::Char_0_nm)),
+                           Actor::new(&self.resources.tm.get(TextureId::Char_0_nm))];
 
         let mut offset = 0.;
         for a in self.actors.iter_mut() {
@@ -321,20 +358,20 @@ impl<'a> Game<'a> {
                                     if self.selecting {
                                         self.selecting = false;
                                         println!("selection over!");
+                                        self.selected_actors.clear();
 
-                                        // select actor under cursor
-                                        let mut actors_to_unselect: Vec<usize> = vec![];
                                         for (i, a) in self.actors.iter_mut().enumerate() {
                                             if a.sprite
                                                 .get_global_bounds()
                                                 .intersects(&self.selection_rect.get_global_bounds()) != None {
-                                                    // TODO:
-                                                    //                                                actor_to_unselect = self.selected_actor;
                                                     if !self.selected_actors.contains(&i) {
                                                         a.sprite.set_color(&Color::green());
                                                         self.selected_actors.push(i);
                                                     }
                                                 }
+                                            else if self.selected_actors.get(i) == None {
+                                                a.sprite.set_color(&Color::white());
+                                            }
                                         }
                                     }
 

@@ -170,7 +170,7 @@ pub trait Pathfinding {
         let current_pos = self.get_pos();
 
         let dest = self.get_first_step().clone();
-        if (dest.x - current_pos.x).abs() < 5. && (dest.y - current_pos.y).abs() < 5. {
+        if (dest.x - current_pos.x).abs() < 4. && (dest.y - current_pos.y).abs() < 4. {
             self.pop_first_step();
             return;
         }

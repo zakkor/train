@@ -18,9 +18,8 @@ impl<'a> Actor<'a> {
     pub fn new(texture: &'a Texture) -> Self {
         let mut sprite = Sprite::new().unwrap();
 //        sprite.set_size2f(25., 25.);
-        sprite.set_color(&Color::red());
         sprite.set_position2f(1280. / 2. - 400., 215.);
-        sprite.set_origin2f(25. / 2., 25. / 2.);
+        sprite.set_origin2f(16., 16.);
         sprite.set_texture(texture, true);
 
         Actor {
