@@ -6,6 +6,7 @@ use std::thread;
 use actor::Actor;
 use std::sync::mpsc::*;
 use pathfinding::*;
+use resource_manager::{TextureManager, TextureId};
 
 pub struct ActorManager<'a> {
     pub actors: Vec<Actor<'a>>,
@@ -29,6 +30,21 @@ impl<'a> ActorManager<'a> {
             is_selecting: false,
             handles: vec![],
             channel: channel(),
+        }
+    }
+
+    pub fn init_actors(&mut self, tm: &'a TextureManager) {
+        self.actors = vec![Actor::new(&tm.get(TextureId::Char0Nm)),
+                           Actor::new(&tm.get(TextureId::Char0Nm)),
+                           Actor::new(&tm.get(TextureId::Char0Nm)),
+                           Actor::new(&tm.get(TextureId::Char0Nm)),
+                           Actor::new(&tm.get(TextureId::Char0Nm))];
+
+        // move them a bit
+        let mut offset = 0.;
+        for a in self.actors.iter_mut() {
+            a.sprite.move2f(offset, 0.);
+            offset += 64.;
         }
     }
 

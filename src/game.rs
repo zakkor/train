@@ -148,18 +148,7 @@ impl<'a> Game<'a> {
 
         //---------
 
-        // TODO: am.init_actors()
-        self.am.actors = vec![Actor::new(&self.resources.tm.get(TextureId::Char_0_nm)),
-                           Actor::new(&self.resources.tm.get(TextureId::Char_0_nm)),
-                           Actor::new(&self.resources.tm.get(TextureId::Char_0_nm)),
-                           Actor::new(&self.resources.tm.get(TextureId::Char_0_nm)),
-                           Actor::new(&self.resources.tm.get(TextureId::Char_0_nm))];
-
-        let mut offset = 0.;
-        for a in self.am.actors.iter_mut() {
-            a.sprite.move2f(offset, 0.);
-            offset += 64.;
-        }
+        self.am.init_actors(&self.resources.tm);
 
         self.enemies = vec![Enemy::new(&self.resources.tm.get(TextureId::Enemy)),
                             Enemy::new(&self.resources.tm.get(TextureId::Enemy))];
@@ -168,7 +157,6 @@ impl<'a> Game<'a> {
             e.sprite.move2f((x as u32 * TILE_SIZE_X) as f32, 0.);
         }
 
-        //        self.train.screech_snd = Some(self.music_manager.get_mut(MusicId::Screech));
         self.paused_text.set_font(&self.resources.fm.get(FontId::Joystix));
         self.paused_text.set_string("PAUSED");
         self.paused_text.set_character_size(36);
@@ -359,20 +347,14 @@ impl<'a> Game<'a> {
                         }
                         event::MouseMoved { x, y, .. } => {
                             for button in &mut self.menu.buttons {
-                                let x = x as f32;
-                                let y = y as f32;
-                                if x > button.text.get_position().x &&
-                                   x <
-                                   (button.text.get_position().x +
-                                    button.text.get_local_bounds().width) &&
-                                   y > button.text.get_position().y &&
-                                   y <
-                                   (button.text.get_position().y +
-                                    button.text.get_local_bounds().height * 2.) {
-                                    // <- *2. because Text bounding box is broken - SFML bug?
+                                let mouse_pos = Vector2f::new(x as f32, y as f32);
+
+                                if button.text.get_global_bounds().contains(mouse_pos) {
                                     button.text.set_color(&Color::green());
+                                    button.is_highlighted = true;
                                 } else {
                                     button.text.set_color(&Color::white());
+                                    button.is_highlighted = false;
                                 }
                             }
                         }
@@ -380,10 +362,7 @@ impl<'a> Game<'a> {
                             match button {
                                 MouseButton::Left => {
                                     for button in &self.menu.buttons {
-                                        // check if the button is literally green
-                                        // TODO: change this to something better
-                                        if button.text.get_color().0 ==
-                                           Color::new_rgb(0, 255, 0).0 {
+                                        if button.is_highlighted {
                                             match button.button_type {
                                                 ButtonType::Quit => {
                                                     self.window.close();
@@ -495,8 +474,6 @@ impl<'a> Game<'a> {
                     }
 
 
-
-
                     // for e in self.enemies.iter_mut() {
                     //     if self.train.current_speed > 0. {
                     //         e.set_path(&self.train.pfgrid_out, &train_origin, self.train.wagons[0].tiles[0][2].sprite.get_position());
@@ -525,17 +502,8 @@ impl<'a> Game<'a> {
                             }
                         }
                     } else {
-                        // {
-                        //     let mut train_sound = self.music_manager.get_mut(MusicId::Train);
-                        //     train_sound.stop();
-                        // }
-                        {
-                            let mut screech_sound = self.music_manager.get_mut(MusicId::Screech);
-                            screech_sound.stop();
-                        }
+                        self.music_manager.get_mut(MusicId::Screech).stop();
                     }
-
-                    //
 
                     for a in self.am.actors.iter_mut() {
                         if !a.inside_wagon {
@@ -572,7 +540,7 @@ impl<'a> Game<'a> {
                 }
 
                 for w in self.train.wagons.iter() {
-                    // culling boys
+                    // view culling
                     let wagon_bound = FloatRect::new(w.get_origin().x,
                                                      w.get_origin().y,
                                                      (w.tiles[0].len() as u32 * TILE_SIZE_X) as f32,

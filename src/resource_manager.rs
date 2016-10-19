@@ -84,8 +84,8 @@ pub enum TextureId {
     Enemy,
     DoorOpen(Direction),
     DoorClosed(Direction),
-    Char_0_nm,
-    Char_0_m,
+    Char0Nm,
+    Char0M,
 }
 #[derive(PartialEq, Eq, Hash)]
 pub enum FontId {
@@ -148,11 +148,10 @@ impl Resources {
         tm.load(TextureId::DoorClosed(Direction::West), "res/door_closed_west.png");
         tm.load(TextureId::DoorClosed(Direction::East), "res/door_closed_east.png");
 
-        tm.load(TextureId::Char_0_nm, "res/char_0_nm.png");
-        tm.load(TextureId::Char_0_m, "res/char_0_m.png");
+        tm.load(TextureId::Char0Nm, "res/char_0_nm.png");
+        tm.load(TextureId::Char0M, "res/char_0_m.png");
 
         let mut sm = SoundManager::new();
-//        sm.
 
         Resources {
             fm: fm,
