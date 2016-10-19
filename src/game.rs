@@ -21,36 +21,9 @@ use camera::*;
 use enemy::*;
 use pathfinding::*;
 use train::*;
+use actor_manager::*;
 use std::sync::mpsc::*;
 
-pub struct NPCManager<T> {
-    npcs: Vec<T>,
-    channel: (Sender<usize>, Receiver<usize>),
-}
-
-pub struct ActorManager<'a> {
-    actors: Vec<Actor<'a>>,
-    selected: Vec<usize>,
-    selection_rect: RectangleShape<'a>,
-    is_selecting: bool,
-    channel: (Sender<usize>, Receiver<usize>),
-}
-
-impl<'a> ActorManager<'a> {
-    pub fn new() -> Self {
-        let mut selection_rect = RectangleShape::new().unwrap();
-        selection_rect.set_size2f(0., 0.);
-        selection_rect.set_fill_color(&Color::new_rgba(0, 255, 0, 150));
-
-        ActorManager {
-            actors: vec![],
-            selected: vec![],
-            selection_rect: selection_rect,
-            is_selecting: false,
-            channel: channel(),
-        }
-    }
-}
 
 pub struct EnemyManager<'a> {
     enemies: Vec<Enemy<'a>>,
@@ -63,34 +36,34 @@ pub struct Game<'a> {
     window: RenderWindow,
     state_stack: StateStack,
     pm: ParticleManager<'a>,
-    clock: Clock,
-    pf_clock: Clock,
+    clock: Clock, // TODO:
+    pf_clock: Clock, // TODO:
     train: Train<'a>,
-    actors: Vec<Actor<'a>>,
+
     enemies: Vec<Enemy<'a>>,
-    selected_actors: Vec<usize>,
+
     menu: Menu<'a>,
     world: World<'a>,
     camera: Camera,
     tile_selection: RectangleShape<'a>,
     paused_text: Text<'a>,
     is_paused: bool,
-    selection_rect: RectangleShape<'a>,
-    selecting: bool,
-    handles: Vec<(usize, JoinHandle<Option<VecDeque<(i32, i32)>>>)>,
-    channel: (Sender<usize>, Receiver<usize>),
 
     am: ActorManager<'a>,
 }
 
 impl<'a> Game<'a> {
+    fn get_coords_of(&self, pos: &Vector2i) -> Vector2f {
+        self.window
+            .map_pixel_to_coords_current_view(pos)
+    }
+
     pub fn new(resources: &'a Resources, music_manager: &'a mut MusicManager) -> Self {
         // Create the window of the application
         let mut window = RenderWindow::new(VideoMode::new_init(WINDOW_SIZE_X, WINDOW_SIZE_Y, 32),
                                            "Train",
                                            window_style::CLOSE,
-                                           &ContextSettings::default())
-            .unwrap();
+                                           &ContextSettings::default()).unwrap();
 
         window.set_framerate_limit(120);
         window.set_vertical_sync_enabled(true);
@@ -115,9 +88,7 @@ impl<'a> Game<'a> {
             clock: Clock::new(),
             pf_clock: Clock::new(),
             train: Train::new(),
-            actors: vec![],
             enemies: vec![],
-            selected_actors: vec![],
             menu: Menu { buttons: vec![] },
             world: World {
                 bgs: vec![],
@@ -127,10 +98,6 @@ impl<'a> Game<'a> {
             tile_selection: tile_selection,
             paused_text: Text::new().unwrap(),
             is_paused: false,
-            selection_rect: selection_rect,
-            selecting: false,
-            handles: vec![],
-            channel: channel(),
             am: ActorManager::new(),
         }
     }
@@ -181,15 +148,16 @@ impl<'a> Game<'a> {
 
         //---------
 
-        self.actors = vec![Actor::new(&self.resources.tm.get(TextureId::Char_0_nm)),
+        // TODO: am.init_actors()
+        self.am.actors = vec![Actor::new(&self.resources.tm.get(TextureId::Char_0_nm)),
                            Actor::new(&self.resources.tm.get(TextureId::Char_0_nm)),
                            Actor::new(&self.resources.tm.get(TextureId::Char_0_nm)),
                            Actor::new(&self.resources.tm.get(TextureId::Char_0_nm)),
                            Actor::new(&self.resources.tm.get(TextureId::Char_0_nm))];
 
         let mut offset = 0.;
-        for a in self.actors.iter_mut() {
-            a.sprite.move2f(offset, offset);
+        for a in self.am.actors.iter_mut() {
+            a.sprite.move2f(offset, 0.);
             offset += 64.;
         }
 
@@ -224,26 +192,21 @@ impl<'a> Game<'a> {
                     match event {
                         event::Closed => self.window.close(),
                         event::MouseMoved { x, y, .. } => {
+                            // move the tile selection rectangle
                             let coords = self.window
                                 .map_pixel_to_coords_current_view(&Vector2i::new(x, y));
-
                             self.tile_selection.set_position2f(((TILE_SIZE_X as u32) * (coords.x as u32 / TILE_SIZE_X)) as f32,
                                                                ((TILE_SIZE_Y as u32) * (coords.y as u32 / TILE_SIZE_Y)) as f32);
 
-                            if self.selecting {
-                                let rect_pos = self.selection_rect.get_position();
-                                self.selection_rect.set_size2f(-(rect_pos.x - x as f32), -(rect_pos.y - y as f32));
-                            }
+                            // update actor selection rectangle
+                            self.am.update_selection_rect(x, y);
                         }
                         event::MouseButtonPressed { button, .. } => {
                             match button {
                                 MouseButton::Left => {
-                                    self.selecting = true;
-                                    self.selection_rect.set_size2f(0., 0.);
-                                    let coords = self.window
-                                        .map_pixel_to_coords_current_view(&self.window
-                                                                          .get_mouse_position());
-                                    self.selection_rect.set_position(&coords);
+                                    // start actor selection
+                                    let coords = self.get_coords_of(&self.window.get_mouse_position());
+                                    self.am.start_selection(&coords);
 
 
                                     // if let Some(a) = actor_to_unselect {
@@ -315,39 +278,13 @@ impl<'a> Game<'a> {
                                     // }
                                 }
                                 MouseButton::Right => {
-                                    if !self.selected_actors.is_empty() {
-                                        println!("{:?}", self.train.total_size);
-                                        let click_pos = self.window
-                                            .map_pixel_to_coords_current_view(&self.window
-                                                                              .get_mouse_position());
-                                        let train_origin = self.train.get_origin();
+                                    // launch movement orders to separate threads for all selected actors
+                                    let click_pos = self.get_coords_of(&self.window.get_mouse_position());
+                                    self.am.launch_movement_orders(self.train.pfgrid_in.clone(),
+                                                                   self.train.pfgrid_out.clone(),
+                                                                   self.train.get_origin(),
+                                                                   click_pos);
 
-                                        for (idx, sa) in self.selected_actors.iter().enumerate() {
-                                            let mut actor = &mut self.actors[*sa];
-
-                                            let pfgrid_to_use = if actor.inside_wagon {
-                                                self.train.pfgrid_in.clone()
-                                            } else {
-                                                self.train.pfgrid_out.clone()
-                                            };
-
-                                            let start = actor.sprite.get_position();
-                                            let send = self.channel.0.clone();
-                                            self.handles.push((idx, thread::spawn(move || {
-                                                let path = compute_path(start,
-                                                             pfgrid_to_use,
-                                                             train_origin,
-                                                             click_pos);
-                                                send.send(idx);
-                                                path
-                                            })));
-
-
-                                            // if let Some(path) = maybe_path {
-                                            //     actor.set_path(path, train_origin);
-                                            // }
-                                        }
-                                    }
                                 }
                                 _ => {}
                             }
@@ -355,26 +292,9 @@ impl<'a> Game<'a> {
                         event::MouseButtonReleased { button, .. } => {
                             match button {
                                 MouseButton::Left => {
-                                    if self.selecting {
-                                        self.selecting = false;
-                                        println!("selection over!");
-                                        self.selected_actors.clear();
-
-                                        for (i, a) in self.actors.iter_mut().enumerate() {
-                                            if a.sprite
-                                                .get_global_bounds()
-                                                .intersects(&self.selection_rect.get_global_bounds()) != None {
-                                                    if !self.selected_actors.contains(&i) {
-                                                        a.sprite.set_color(&Color::green());
-                                                        self.selected_actors.push(i);
-                                                    }
-                                                }
-                                            else if self.selected_actors.get(i) == None {
-                                                a.sprite.set_color(&Color::white());
-                                            }
-                                        }
-                                    }
-
+                                    // MBleft released => we actually select the actors
+                                    // inside the selection rectangle
+                                    self.am.apply_selection();
                                 }
                                 _ => {}
                             }
@@ -508,17 +428,16 @@ impl<'a> Game<'a> {
         match *self.state_stack.top().unwrap() {
             StateType::Playing => {
                 let train_origin = self.train.get_origin();
-                for recv in self.channel.1.try_iter() {
-                    println!("recv val {}, sa len: {}", recv, self.selected_actors.len());
-                    let true_index = self.handles.iter().position(|ref x| x.0 == recv).unwrap();
-                    self.actors[self.selected_actors[recv]].set_path(&mut self.handles.remove(true_index).1.join().unwrap().unwrap(),
-                                                                     train_origin);
-                }
+
+
+                self.am.update_threads(train_origin);
+
+
 
                 if !self.is_paused {
                     let dt = time.as_seconds();
 
-                    for a in self.actors.iter_mut() {
+                    for a in self.am.actors.iter_mut() {
                         a.update_movement(&self.train.wagons, dt);
                     }
 
@@ -618,7 +537,7 @@ impl<'a> Game<'a> {
 
                     //
 
-                    for a in self.actors.iter_mut() {
+                    for a in self.am.actors.iter_mut() {
                         if !a.inside_wagon {
                             //TODO: add collision checking to this (refactor what is above into a checking function)
                             a.sprite.move2f(dt * -self.train.current_speed, 0.);
@@ -669,27 +588,12 @@ impl<'a> Game<'a> {
                     }
                 }
 
-                for a in self.actors.iter() {
-                    // draw path
-                    let steps = Vec::from(a.move_seq.clone());
-                    for step in steps.windows(2) {
-                        let mut va = VertexArray::new().unwrap();
-                        va.set_primitive_type(PrimitiveType::sfLines);
-                        va.append(&Vertex::new_with_pos_color(&step[0], &Color::green()));
-                        va.append(&Vertex::new_with_pos_color(&step[1], &Color::green()));
-                        self.window.draw(&va);
-                    }
-
-                    self.window.draw(&a.sprite);
-                }
-
                 for e in self.enemies.iter() {
                     self.window.draw(&e.sprite);
                 }
 
-                if self.selecting {
-                    self.window.draw(&self.selection_rect);
-                }
+                // draw all of our actors and their paths
+                self.am.draw(&mut self.window);
 
                 // if let Some(selected_actor) = self.selected_actor {
                 //     for (i, t) in if self.actors[selected_actor].inside_wagon {
@@ -715,7 +619,7 @@ impl<'a> Game<'a> {
                 //         }
                 //     }
                 // }
-                if !self.selected_actors.is_empty() {
+                if !self.am.selected.is_empty() {
                     self.window.draw(&self.tile_selection);
                 }
 
