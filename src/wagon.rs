@@ -49,6 +49,7 @@ impl<'a> Tile<'a> {
     pub fn new_with_texture(texture: &'a Texture) -> Self {
         let mut new_tile = Tile::new();
         new_tile.sprite.set_texture(texture, false);
+        new_tile.sprite.set_origin2f(TILE_SIZE_X as f32 / 2., TILE_SIZE_Y as f32 / 2.);
         new_tile
     }
 }
@@ -57,6 +58,8 @@ impl<'a> Tile<'a> {
 pub struct Wagon<'a> {
     pub tiles: Vec<Vec<Tile<'a>>>,
     pub connected_to: [Option<&'a mut Wagon<'a>>; 2],
+    pub rotation: f32,
+    pub center: Vector2f,
 }
 
 
@@ -72,39 +75,47 @@ impl<'a> Wagon<'a> {
             tiles.push(vec![]);
             for j in 0..(size_x + 2) {
                 let mut tile = Tile::new();
+                tile.sprite.set_origin2f(TILE_SIZE_X as f32 / 2., TILE_SIZE_Y as f32 / 2.);
                 tile.sprite.set_position2f((j * TILE_SIZE_X) as f32, (i * TILE_SIZE_Y) as f32);
                 tile.is_solid = true;
 
                 if (i, j) == (0, 0) {
-                    tile.sprite.set_texture(tex_man.get(TextureId::CornerTopLeft), true);
+                    tile.sprite.set_texture(tex_man.get(TextureId::Corner), true);
                     tile.bounds[0] = Some(FloatRect::new(58., 58., 6., 6.));
                 } else if (i, j) == (size_y + 1, 0) {
-                    tile.sprite.set_texture(tex_man.get(TextureId::CornerBottomLeft), true);
-
+                    tile.sprite.set_texture(tex_man.get(TextureId::Corner), true); // bleft
+                    tile.sprite.set_rotation(270.);
                     tile.bounds[0] = Some(FloatRect::new(58., 0., 6., 6.));
                 } else if (i, j) == (0, size_x + 1) {
-                    tile.sprite.set_texture(tex_man.get(TextureId::CornerTopRight), true);
+                    tile.sprite.set_texture(tex_man.get(TextureId::Corner), true); // topright
+                    tile.sprite.set_rotation(90.);
                     tile.bounds[0] = Some(FloatRect::new(0., 58., 6., 6.));
                 } else if (i, j) == (size_y + 1, size_x + 1) {
-                    tile.sprite.set_texture(tex_man.get(TextureId::CornerBottomRight), true);
+                    tile.sprite.set_texture(tex_man.get(TextureId::Corner), true); // bright
+                    tile.sprite.set_rotation(180.);
                     tile.bounds[0] = Some(FloatRect::new(0., 0., 6., 6.));
                 } else if j == 0 {
-                    tile.sprite.set_texture(tex_man.get(TextureId::WallLeft), true);
+                    tile.sprite.set_texture(tex_man.get(TextureId::Wall), true);
+                    tile.sprite.set_rotation(270.);
                     tile.bounds[0] = Some(FloatRect::new(58., 0., 6., 64.));
                 } else if j == size_x + 1 {
-                    tile.sprite.set_texture(tex_man.get(TextureId::WallRight), true);
+                    tile.sprite.set_texture(tex_man.get(TextureId::Wall), true);
+                    tile.sprite.set_rotation(90.);
+
                     tile.bounds[0] = Some(FloatRect::new(0., 0., 6., 64.));
                 } else if i == 0 && j == size_x / 2 {
                     tile.tile_type = TileType::Door(Direction::North);
-                    tile.sprite.set_texture(tex_man.get(TextureId::DoorClosed(Direction::North)), true);
+                    tile.sprite.set_texture(tex_man.get(TextureId::DoorClosed), true);
                 } else if i == 0 {
-                    tile.sprite.set_texture(tex_man.get(TextureId::WallTop), true);
+                    tile.sprite.set_texture(tex_man.get(TextureId::Wall), true);
                     tile.bounds[0] = Some(FloatRect::new(0., 58., 64., 6.));
                 } else if i == size_y + 1 && j == size_x / 2 {
                     tile.tile_type = TileType::Door(Direction::South);
-                    tile.sprite.set_texture(tex_man.get(TextureId::DoorClosed(Direction::South)), true);
+                    tile.sprite.set_texture(tex_man.get(TextureId::DoorClosed), true);
+                    tile.sprite.set_rotation(180.);
                 } else if i == size_y + 1 {
-                    tile.sprite.set_texture(tex_man.get(TextureId::WallBottom), true);
+                    tile.sprite.set_texture(tex_man.get(TextureId::Wall), true);
+                    tile.sprite.set_rotation(180.);
                     tile.bounds[0] = Some(FloatRect::new(0., 0., 64., 6.));
                 } else {
                     tile.sprite.set_texture(tex_man.get(TextureId::Floor), true);
@@ -114,9 +125,15 @@ impl<'a> Wagon<'a> {
             }
         }
 
+        let width = tiles[0].len() as f32 * TILE_SIZE_X as f32 / 2. - TILE_SIZE_X as f32 / 2.;
+        let height = tiles.len() as f32 * TILE_SIZE_Y as f32 / 2. - TILE_SIZE_Y as f32 / 2.;
+        let center = Vector2f::new(width, height);
+
         Wagon {
             tiles: tiles,
             connected_to: [None, None],
+            rotation: 0.,
+            center: center,
         }
     }
 
@@ -129,9 +146,15 @@ impl<'a> Wagon<'a> {
                 t.sprite.set_position2f(x + current_pos.x - origin.x, y + current_pos.y - origin.y);
             }
         }
+
+        self.center.x = x;
+        self.center.y = y;
     }
 
     pub fn move2f(&mut self, x: f32, y: f32) {
+        self.center.x += x;
+        self.center.y += y;
+
         for tls in self.tiles.iter_mut() {
             for t in tls.iter_mut() {
                 t.sprite.move2f(x, y);
@@ -141,7 +164,7 @@ impl<'a> Wagon<'a> {
 
     pub fn rotate(&mut self, angle: f32) {
         let angle_rad = angle * ::std::f64::consts::PI as f32 / 180.;
-        let orig = self.get_origin() + self.get_middle();
+        let orig = self.get_origin();
 
         let formula_rot = |pos: Vector2f| {
             let mut point = Vector2f::new(0., 0.);
@@ -150,9 +173,22 @@ impl<'a> Wagon<'a> {
             point
         };
 
+        // rotate origin
+        self.center.x -= orig.x;
+        self.center.y -= orig.y;
+
+        let pos = self.center;
+
+        let new = formula_rot(pos);
+
+        self.center = orig + new;
+
+        let orig = self.get_origin();
+
         for t in self.tiles.iter_mut() {
             for t in t.iter_mut() {
                 t.sprite.move2f(-orig.x, -orig.y);
+
                 let pos = t.sprite.get_position();
 
                 let new = formula_rot(pos);
@@ -162,41 +198,25 @@ impl<'a> Wagon<'a> {
                 t.sprite.rotate(angle);
             }
         }
+
+        self.rotation += angle;
     }
 
     pub fn set_rotation(&mut self, angle: f32) {
-        let angle_rad = angle * ::std::f64::consts::PI as f32 / 180.;
-        let orig = self.get_origin() + self.get_middle();
-
-        let formula_rot = |pos: Vector2f| {
-            let mut point = Vector2f::new(0., 0.);
-            point.x = pos.x * angle_rad.cos() - pos.y * angle_rad.sin();
-            point.y = pos.x * angle_rad.sin() + pos.y * angle_rad.cos();
-            point
-        };
-
-        for t in self.tiles.iter_mut() {
-            for t in t.iter_mut() {
-                t.sprite.move2f(-orig.x, -orig.y);
-                let pos = t.sprite.get_position();
-
-                let new = formula_rot(pos);
-
-                t.sprite.set_position(&(orig + new));
-
-                t.sprite.rotate(angle);
-            }
-        }
+        let current_rot = self.rotation;
+        self.rotate(360. - current_rot);
+        self.rotate(angle);
+        self.rotation = angle;
     }
 
-    pub fn get_middle(&self) -> Vector2f {
-        let width = self.tiles[0].len() as f32 * TILE_SIZE_X as f32 / 2.;
-        let height = self.tiles.len() as f32 * TILE_SIZE_Y as f32 / 2.;
-        Vector2f::new(width, height)
-    }
+    // pub fn get_middle(&self) -> Vector2f {
+    //     let width = self.tiles[0].len() as f32 * TILE_SIZE_X as f32 / 2.;
+    //     let height = self.tiles.len() as f32 * TILE_SIZE_Y as f32 / 2.;
+    //     Vector2f::new(width, height)
+    // }
 
     pub fn get_origin(&self) -> Vector2f {
-        self.tiles[0][0].sprite.get_position().clone()
+        self.center
     }
 
     /// Connects wagon `other` to the *left* side of wagon `self`.
@@ -210,6 +230,9 @@ impl<'a> Wagon<'a> {
         self.tiles[self_height_half - 1][0]
             .sprite
             .set_texture(tex_man.get(TextureId::ConnectorTop), true);
+        self.tiles[self_height_half - 1][0]
+            .sprite
+            .set_rotation(0.);
         self.tiles[self_height_half - 1][0].bounds[1] = Some(FloatRect::new(0., 58., 64., 6.));
 
         self.tiles[self_height_half][0].sprite.set_texture(tex_man.get(TextureId::Floor), true);
@@ -218,11 +241,18 @@ impl<'a> Wagon<'a> {
         self.tiles[self_height_half + 1][0]
             .sprite
             .set_texture(tex_man.get(TextureId::ConnectorBottom), true);
+        self.tiles[self_height_half + 1][0]
+            .sprite
+            .set_rotation(0.);
+
         self.tiles[self_height_half + 1][0].bounds[1] = Some(FloatRect::new(0., 0., 64., 6.));
 
         other.tiles[other_height_half - 1][other_width - 1]
             .sprite
             .set_texture(tex_man.get(TextureId::WallConnectedTop), true);
+        other.tiles[other_height_half - 1][other_width - 1]
+            .sprite
+            .set_rotation(0.);
         other.tiles[other_height_half][other_width - 1] = {
             let mut tile = Tile::new();
             tile.is_solid = true;
@@ -231,6 +261,9 @@ impl<'a> Wagon<'a> {
         other.tiles[other_height_half + 1][other_width - 1]
             .sprite
             .set_texture(tex_man.get(TextureId::WallConnectedBottom), true);
+        other.tiles[other_height_half + 1][other_width - 1]
+            .sprite
+            .set_rotation(0.);
 
         // note: don't make this "better"
         let y_offset = if self_height_half > other_height_half {
@@ -239,8 +272,10 @@ impl<'a> Wagon<'a> {
             -((other_height_half - self_height_half) as i32)
         } * TILE_SIZE_Y as i32;
 
-        other.set_position2f((self.tiles[0][0].sprite.get_position().x - ((other_width - 1) * TILE_SIZE_X as usize) as f32) as f32,
-                             self.tiles[0][0].sprite.get_position().y + y_offset as f32);
+        let self_center = self.get_origin();
+
+        other.set_position2f(( self_center.x - ((other_width - 1) * TILE_SIZE_X as usize) as f32) as f32,
+                             self_center.y + y_offset as f32);
     }
 }
 

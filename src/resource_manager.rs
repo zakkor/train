@@ -67,14 +67,8 @@ impl<I: Eq + Hash, R: Resource> ResourceManager<I, R> {
 #[derive(PartialEq, Eq, Hash)]
 pub enum TextureId {
     Floor,
-    WallTop,
-    WallBottom,
-    WallLeft,
-    WallRight,
-    CornerTopLeft,
-    CornerTopRight,
-    CornerBottomLeft,
-    CornerBottomRight,
+    Wall,
+    Corner,
     ConnectorTop,
     ConnectorBottom,
     WallConnectedTop,
@@ -82,8 +76,8 @@ pub enum TextureId {
     Background,
     Actor,
     Enemy,
-    DoorOpen(Direction),
-    DoorClosed(Direction),
+    DoorOpen,
+    DoorClosed,
     Char0Nm,
     Char0M,
 }
@@ -123,30 +117,17 @@ impl Resources {
 
         let mut tm = TextureManager::new();
         tm.load(TextureId::Floor, "res/floor.png");
-        tm.load(TextureId::WallTop, "res/wall_top.png");
-        tm.load(TextureId::WallBottom, "res/wall_bottom.png");
-        tm.load(TextureId::WallLeft, "res/wall_left.png");
-        tm.load(TextureId::WallRight, "res/wall_right.png");
-        tm.load(TextureId::CornerTopLeft, "res/corner_topleft.png");
-        tm.load(TextureId::CornerTopRight, "res/corner_topright.png");
-        tm.load(TextureId::CornerBottomLeft, "res/corner_bottomleft.png");
-        tm.load(TextureId::CornerBottomRight, "res/corner_bottomright.png");
+        tm.load(TextureId::Wall, "res/wall.png");
+        tm.load(TextureId::Corner, "res/corner.png");
         tm.load(TextureId::ConnectorTop, "res/connector_top.png");
         tm.load(TextureId::ConnectorBottom, "res/connector_bottom.png");
         tm.load(TextureId::WallConnectedTop, "res/wall_connected_top.png");
-        tm.load(TextureId::WallConnectedBottom,
-                "res/wall_connected_bottom.png");
+        tm.load(TextureId::WallConnectedBottom,"res/wall_connected_bottom.png");
         tm.load(TextureId::Background, "res/bg.png");
         tm.load(TextureId::Actor, "res/actor.png");
         tm.load(TextureId::Enemy, "res/enemy.png");
-        tm.load(TextureId::DoorOpen(Direction::North), "res/door_north.png");
-        tm.load(TextureId::DoorOpen(Direction::South), "res/door_south.png");
-        tm.load(TextureId::DoorOpen(Direction::West), "res/door_west.png");
-        tm.load(TextureId::DoorOpen(Direction::East), "res/door_east.png");
-        tm.load(TextureId::DoorClosed(Direction::North), "res/door_closed_north.png");
-        tm.load(TextureId::DoorClosed(Direction::South), "res/door_closed_south.png");
-        tm.load(TextureId::DoorClosed(Direction::West), "res/door_closed_west.png");
-        tm.load(TextureId::DoorClosed(Direction::East), "res/door_closed_east.png");
+        tm.load(TextureId::DoorOpen, "res/door_open.png");
+        tm.load(TextureId::DoorClosed, "res/door_closed.png");
 
         tm.load(TextureId::Char0Nm, "res/char_0_nm.png");
         tm.load(TextureId::Char0M, "res/char_0_m.png");

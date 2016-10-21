@@ -137,7 +137,7 @@ impl<'a> Game<'a> {
         self.train.wagons.push(Wagon::new(&self.resources.tm, 8, 3));
 
         let mut y_size: i32 = 5;
-        for x in 0..9 {
+        for x in 0..2 {
             let mut new_wag = Wagon::new(&self.resources.tm, 8, 3);
             y_size += if x % 2 == 0 { 2 } else { -2 };
 
@@ -146,23 +146,23 @@ impl<'a> Game<'a> {
             self.train.wagons.push(new_wag);
         }
 
-        self.train.set_position2f(2. * TILE_SIZE_X as f32, 4. * TILE_SIZE_Y as f32);
+        self.train.set_position2f(0., 0.);
         self.train.rebuild_pfgrids();
 
-        'wagons: for wagon in self.train.wagons.iter_mut() {
-            let global_middle = wagon.get_origin() + wagon.get_middle();
-            let origin = wagon.get_origin();
+        // 'wagons: for wagon in self.train.wagons.iter_mut() {
+        //     let global_middle = wagon.get_origin() + wagon.get_middle();
+        //     let origin = wagon.get_origin();
 
-            for rail in self.world.rails.iter() {
-                if global_middle.x > rail.get_position().x &&
-                    global_middle.x < rail.get_size().x + rail.get_position().x {
-                        wagon.set_position2f(origin.x, rail.get_position().y - TILE_SIZE_Y as f32);
-                        wagon.rotate(rail.get_rotation());
+        //     for rail in self.world.rails.iter() {
+        //         if global_middle.x > rail.get_position().x &&
+        //             global_middle.x < rail.get_size().x + rail.get_position().x {
+        //                 wagon.set_position2f(origin.x, rail.get_position().y - TILE_SIZE_Y as f32);
+        //                 wagon.rotate(rail.get_rotation());
 
-                        continue 'wagons;
-                }
-            }
-        }
+        //                 continue 'wagons;
+        //         }
+        //     }
+        // }
 
 
         //---------
@@ -498,17 +498,15 @@ impl<'a> Game<'a> {
 
                     self.train.update();
 
-                    'wagons: for wagon in self.train.wagons.iter_mut() {
-                        let global_middle = wagon.get_origin() + wagon.get_middle();
+                    for wagon in self.train.wagons.iter_mut() {
                         let origin = wagon.get_origin();
 
                         for rail in self.world.rails.iter() {
-                            if global_middle.x > rail.get_position().x &&
-                                global_middle.x < rail.get_size().x + rail.get_position().x {
-                                    wagon.set_position2f(origin.x, rail.get_position().y - TILE_SIZE_Y as f32);
-                                    wagon.rotate(rail.get_rotation());
-
-                                    continue 'wagons;
+                            if origin.x > rail.get_position().x &&
+                                origin.x < rail.get_size().x + rail.get_position().x {
+                                    wagon.set_rotation(rail.get_rotation());
+                                    wagon.set_position2f(origin.x, rail.get_position().y + 1.5 * TILE_SIZE_Y as f32);
+                                    break;
                                 }
                         }
                     }
@@ -538,6 +536,9 @@ impl<'a> Game<'a> {
                             //TODO: add collision checking to this (refactor what is above into a checking function)
                             a.sprite.move2f(dt * -self.train.current_speed, 0.);
                         }
+                        a.sprite.set_rotation(self.train.wagons[1].rotation);
+                        let xpos =  a.sprite.get_position().x;
+                        a.sprite.set_position2f(xpos, self.train.wagons[1].get_origin().y); // TODO: rotate around point
                     }
 
                     for e in self.enemies.iter_mut() {
@@ -546,6 +547,11 @@ impl<'a> Game<'a> {
                             e.sprite.move2f(dt * -self.train.current_speed, 0.);
                         }
                     }
+
+                    // TODO: VIEW RELATED TO WAGON ROTATION & MOVEMENT
+                    //self.camera.game.set_rotation(self.train.wagons[1].rotation);
+                    //self.camera.game.set_center(&self.train.wagons[1].get_origin());
+
                 }
             }
             _ => {}
@@ -572,20 +578,20 @@ impl<'a> Game<'a> {
                 }
 
                 for w in self.train.wagons.iter() {
-                    // view culling
-                    let wagon_bound = FloatRect::new(w.get_origin().x,
-                                                     w.get_origin().y,
-                                                     (w.tiles[0].len() as u32 * TILE_SIZE_X) as f32,
-                                                     (w.tiles.len() as u32 * TILE_SIZE_Y) as f32);
+                    // // view culling
+                    // let wagon_bound = FloatRect::new(w.get_origin().x / 2.,
+                    //                                  w.get_origin().y / 2.,
+                    //                                  (w.tiles[0].len() as u32 * TILE_SIZE_X) as f32,
+                    //                                  (w.tiles.len() as u32 * TILE_SIZE_Y) as f32);
 
-                    let view = &self.camera.game;
-                    let view_rect = FloatRect::new(view.get_center().x - view.get_size().x / 2.,
-                                                   view.get_center().y - view.get_size().y / 2.,
-                                                   view.get_size().x,
-                                                   view.get_size().y);
-                    if let Some(_) = view_rect.intersects(&wagon_bound) {
+                    // let view = &self.camera.game;
+                    // let view_rect = FloatRect::new(view.get_center().x - view.get_size().x / 2.,
+                    //                                view.get_center().y - view.get_size().y / 2.,
+                    //                                view.get_size().x,
+                    //                                view.get_size().y);
+                    // if let Some(_) = view_rect.intersects(&wagon_bound) {
                         self.window.draw(w);
-                    }
+                    //}
                 }
 
                 for e in self.enemies.iter() {
@@ -593,11 +599,11 @@ impl<'a> Game<'a> {
                 }
 
                 // draw all of our actors and their paths
-                //self.am.draw(&mut self.window);
+                self.am.draw(&mut self.window);
 
 
-                // debug pfgrid view
-                // for (i, t) in  self.train.pfgrid_out.grid.iter().enumerate() {
+               // debug pfgrid view
+                // for (i, t) in  self.train.pfgrid_in.grid.iter().enumerate() {
                 //     for (j, t) in t.iter().enumerate() {
                 //         let train_origin = self.train.get_origin();
 
