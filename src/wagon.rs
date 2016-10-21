@@ -121,19 +121,14 @@ impl<'a> Wagon<'a> {
     }
 
     pub fn set_position2f(&mut self, x: f32, y: f32) {
-//        let origin = self.get_origin();
-//        let difference = Vector2f::new((x - origin.x).abs(), (y - origin.y).abs());
+        let origin = self.get_origin();
 
         for tls in self.tiles.iter_mut() {
             for t in tls.iter_mut() {
                 let current_pos = t.sprite.get_position();
-                t.sprite.set_position2f(current_pos.x + x, current_pos.y + y);
+                t.sprite.set_position2f(x + current_pos.x - origin.x, y + current_pos.y - origin.y);
             }
         }
-
-        //     // if let Some(ref mut x) = self.connected_to[0] {
-        //     //     x.set_position2f(dest_x, dest_y);
-        //     // }
     }
 
     pub fn move2f(&mut self, x: f32, y: f32) {
@@ -142,6 +137,62 @@ impl<'a> Wagon<'a> {
                 t.sprite.move2f(x, y);
             }
         }
+    }
+
+    pub fn rotate(&mut self, angle: f32) {
+        let angle_rad = angle * ::std::f64::consts::PI as f32 / 180.;
+        let orig = self.get_origin() + self.get_middle();
+
+        let formula_rot = |pos: Vector2f| {
+            let mut point = Vector2f::new(0., 0.);
+            point.x = pos.x * angle_rad.cos() - pos.y * angle_rad.sin();
+            point.y = pos.x * angle_rad.sin() + pos.y * angle_rad.cos();
+            point
+        };
+
+        for t in self.tiles.iter_mut() {
+            for t in t.iter_mut() {
+                t.sprite.move2f(-orig.x, -orig.y);
+                let pos = t.sprite.get_position();
+
+                let new = formula_rot(pos);
+
+                t.sprite.set_position(&(orig + new));
+
+                t.sprite.rotate(angle);
+            }
+        }
+    }
+
+    pub fn set_rotation(&mut self, angle: f32) {
+        let angle_rad = angle * ::std::f64::consts::PI as f32 / 180.;
+        let orig = self.get_origin() + self.get_middle();
+
+        let formula_rot = |pos: Vector2f| {
+            let mut point = Vector2f::new(0., 0.);
+            point.x = pos.x * angle_rad.cos() - pos.y * angle_rad.sin();
+            point.y = pos.x * angle_rad.sin() + pos.y * angle_rad.cos();
+            point
+        };
+
+        for t in self.tiles.iter_mut() {
+            for t in t.iter_mut() {
+                t.sprite.move2f(-orig.x, -orig.y);
+                let pos = t.sprite.get_position();
+
+                let new = formula_rot(pos);
+
+                t.sprite.set_position(&(orig + new));
+
+                t.sprite.rotate(angle);
+            }
+        }
+    }
+
+    pub fn get_middle(&self) -> Vector2f {
+        let width = self.tiles[0].len() as f32 * TILE_SIZE_X as f32 / 2.;
+        let height = self.tiles.len() as f32 * TILE_SIZE_Y as f32 / 2.;
+        Vector2f::new(width, height)
     }
 
     pub fn get_origin(&self) -> Vector2f {

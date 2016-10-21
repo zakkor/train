@@ -9,6 +9,8 @@ use sfml::system::*;
 use sfml::window::*;
 use sfml::audio::*;
 
+use lyon_bezier::*;
+
 use state_stack::*;
 use resource_manager::*;
 use particle_manager::*;
@@ -93,6 +95,8 @@ impl<'a> Game<'a> {
             world: World {
                 bgs: vec![],
                 rails: vec![],
+                connectors: vec![],
+                curves: vec![],
             },
             camera: Camera::new(),
             tile_selection: tile_selection,
@@ -133,7 +137,7 @@ impl<'a> Game<'a> {
         self.train.wagons.push(Wagon::new(&self.resources.tm, 8, 3));
 
         let mut y_size: i32 = 5;
-        for x in 0..10 {
+        for x in 0..9 {
             let mut new_wag = Wagon::new(&self.resources.tm, 8, 3);
             y_size += if x % 2 == 0 { 2 } else { -2 };
 
@@ -142,9 +146,24 @@ impl<'a> Game<'a> {
             self.train.wagons.push(new_wag);
         }
 
+        self.train.set_position2f(2. * TILE_SIZE_X as f32, 4. * TILE_SIZE_Y as f32);
         self.train.rebuild_pfgrids();
 
-        self.train.set_position2f(2. * TILE_SIZE_X as f32, 2. * TILE_SIZE_Y as f32);
+        'wagons: for wagon in self.train.wagons.iter_mut() {
+            let global_middle = wagon.get_origin() + wagon.get_middle();
+            let origin = wagon.get_origin();
+
+            for rail in self.world.rails.iter() {
+                if global_middle.x > rail.get_position().x &&
+                    global_middle.x < rail.get_size().x + rail.get_position().x {
+                        wagon.set_position2f(origin.x, rail.get_position().y - TILE_SIZE_Y as f32);
+                        wagon.rotate(rail.get_rotation());
+
+                        continue 'wagons;
+                }
+            }
+        }
+
 
         //---------
 
@@ -196,15 +215,9 @@ impl<'a> Game<'a> {
                                     let coords = self.get_coords_of(&self.window.get_mouse_position());
                                     self.am.start_selection(&coords);
 
-
-                                    // if let Some(a) = actor_to_unselect {
-                                    //     self.actors[a].sprite.set_color(&Color::white());
-                                    // }
-
-                                    // if let Some(sa) = self.selected_actor {
-                                    //     let click_pos = self.window
-                                    //         .map_pixel_to_coords_current_view(&self.window
-                                    //                                           .get_mouse_position());
+                                    // if !self.am.selected.is_empty() {
+                                    //     let click_pos = self.get_coords_of(&self.window
+                                    //                                        .get_mouse_position());
                                     //     // open/close door
                                     //     let mut pfgrids_must_be_rebuilt = false;
                                     //     let train_origin = self.train.get_origin();
@@ -485,6 +498,21 @@ impl<'a> Game<'a> {
 
                     self.train.update();
 
+                    'wagons: for wagon in self.train.wagons.iter_mut() {
+                        let global_middle = wagon.get_origin() + wagon.get_middle();
+                        let origin = wagon.get_origin();
+
+                        for rail in self.world.rails.iter() {
+                            if global_middle.x > rail.get_position().x &&
+                                global_middle.x < rail.get_size().x + rail.get_position().x {
+                                    wagon.set_position2f(origin.x, rail.get_position().y - TILE_SIZE_Y as f32);
+                                    wagon.rotate(rail.get_rotation());
+
+                                    continue 'wagons;
+                                }
+                        }
+                    }
+
                     // sounds
                     if self.train.current_speed > 0. {
                         {
@@ -535,6 +563,10 @@ impl<'a> Game<'a> {
                     self.window.draw(bg);
                 }
 
+                for ctr in self.world.connectors.iter() {
+                    self.window.draw(ctr);
+                }
+
                 for rail in self.world.rails.iter() {
                     self.window.draw(rail);
                 }
@@ -561,32 +593,29 @@ impl<'a> Game<'a> {
                 }
 
                 // draw all of our actors and their paths
-                self.am.draw(&mut self.window);
+                //self.am.draw(&mut self.window);
 
-                // if let Some(selected_actor) = self.selected_actor {
-                //     for (i, t) in if self.actors[selected_actor].inside_wagon {
-                //         self.train.pfgrid_in.grid.iter().enumerate()
-                //     } else {
-                //         self.train.pfgrid_out.grid.iter().enumerate()
-                //     } {
-                //         for (j, t) in t.iter().enumerate() {
-                //             let train_origin = self.train.get_origin();
 
-                //             let mut shape = RectangleShape::new().unwrap();
-                //             shape.set_size2f(64., 64.);
-                //             shape.set_position2f(i as f32 * 64. + train_origin.x - 2. * 64.,
-                //                                  j as f32 * 64. + train_origin.y - 2. * 64.);
+                // debug pfgrid view
+                // for (i, t) in  self.train.pfgrid_out.grid.iter().enumerate() {
+                //     for (j, t) in t.iter().enumerate() {
+                //         let train_origin = self.train.get_origin();
 
-                //             if t.walkable {
-                //                 shape.set_fill_color(&Color::new_rgba(0, 255, 0, 120));
-                //             } else {
-                //                 shape.set_fill_color(&Color::new_rgba(255, 0, 0, 120));
-                //             }
+                //         let mut shape = RectangleShape::new().unwrap();
+                //         shape.set_size2f(64., 64.);
+                //         shape.set_position2f(i as f32 * 64. + train_origin.x - 2. * 64.,
+                //                              j as f32 * 64. + train_origin.y - 2. * 64.);
 
-                //             self.window.draw(&shape);
+                //         if t.walkable {
+                //             shape.set_fill_color(&Color::new_rgba(0, 255, 0, 120));
+                //         } else {
+                //             shape.set_fill_color(&Color::new_rgba(255, 0, 0, 120));
                 //         }
+
+                //         self.window.draw(&shape);
                 //     }
                 // }
+
                 if !self.am.selected.is_empty() {
                     self.window.draw(&self.tile_selection);
                 }

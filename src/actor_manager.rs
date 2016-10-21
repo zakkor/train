@@ -43,7 +43,7 @@ impl<'a> ActorManager<'a> {
         // move them a bit
         let mut offset = 0.;
         for a in self.actors.iter_mut() {
-            a.sprite.move2f(offset, 0.);
+            a.sprite.move2f(offset, 128.);
             offset += 64.;
         }
     }
@@ -51,8 +51,14 @@ impl<'a> ActorManager<'a> {
     pub fn update_threads(&mut self, train_origin: Vector2f) {
         for recv in self.channel.1.try_iter() {
             let true_index = self.handles.iter().position(|ref x| x.0 == recv).unwrap();
-            self.actors[self.selected[recv]].set_path(&mut self.handles.remove(true_index).1.join().unwrap().unwrap(),
-                                                            train_origin);
+            let path = self.handles.remove(true_index).1.join().unwrap();
+            if let Some(mut p) = path {
+                self.actors[self.selected[recv]].set_path(&mut p,
+                                                          train_origin);
+            } else {
+                println!("no path!");
+            }
+
         }
     }
 
@@ -65,7 +71,7 @@ impl<'a> ActorManager<'a> {
 
     pub fn start_selection(&mut self, coords: &Vector2f) {
         self.is_selecting = true;
-        self.selection_rect.set_size2f(0., 0.);
+        self.selection_rect.set_size2f(1., 1.);
         self.selection_rect.set_position(coords);
     }
 

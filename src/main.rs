@@ -6,6 +6,7 @@
 extern crate sfml;
 extern crate rand;
 extern crate astar;
+extern crate lyon_bezier;
 
 mod state_stack;
 mod resource_manager;

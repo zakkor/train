@@ -105,8 +105,8 @@ pub trait Pathfinding {
         let mut path = path.iter();
         path.next();
 
-        for step in path {
-            self.add_step(Vector2f::new((step.0 as f32 + (train_pos.y - 2. * 64.) / TILE_SIZE_X as f32) * TILE_SIZE_X as f32 +
+        for step in path { //                             vvvvvvvvvvvvvvvvvvvvvv maybe grid.0?
+            self.add_step(Vector2f::new((step.0 as f32 + (train_pos.x - 2. * 64.) / TILE_SIZE_X as f32) * TILE_SIZE_X as f32 +
                                         TILE_SIZE_X as f32 / 2.,
                                         (step.1 as f32 + (train_pos.y - 2. * 64.) / TILE_SIZE_Y as f32) * TILE_SIZE_Y as f32 +
                                         TILE_SIZE_Y as f32 / 2.));
@@ -226,12 +226,14 @@ pub fn compute_path(start: Vector2f, grid: PathfindingGrid, train_pos: Vector2f,
                  start.y as i32 / TILE_SIZE_Y as i32
                  - (train_pos.y - grid.padding.0 as f32 * TILE_SIZE_X as f32) as i32 / TILE_SIZE_Y as i32);
 
+    //                                                    vvvvvvvvvvvvvvvvvvvvvv grid.padding?
     let end = (click_pos.x as i32 / TILE_SIZE_X as i32 - (train_pos.x - 2. * 64.) as i32 / TILE_SIZE_X as i32,
                click_pos.y as i32 / TILE_SIZE_Y as i32 - (train_pos.y - 2. * 64.) as i32 / TILE_SIZE_Y as i32);
 
-    //        self.clear_steps();
 
     let mut ts = GridSearch::new(&grid, start, end);
+
+//    sleep(Time::with_seconds(2.));
 
     astar(&mut ts)
 }
