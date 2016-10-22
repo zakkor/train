@@ -41,9 +41,9 @@ impl<'a> ActorManager<'a> {
                            Actor::new(&tm.get(TextureId::Char0Nm))];
 
         // move them a bit
-        let mut offset = 0.;
+        let mut offset = 256.;
         for a in self.actors.iter_mut() {
-            a.sprite.move2f(offset, 128.);
+            a.sprite.move2f(offset, 96.);
             offset += 64.;
         }
     }

@@ -12,6 +12,7 @@ pub struct Actor<'a> {
     pub sprite: Sprite<'a>,
     pub inside_wagon: bool,
     pub move_seq: VecDeque<Vector2f>,
+    pub rotation: f32,
 }
 
 impl<'a> Actor<'a> {
@@ -26,6 +27,7 @@ impl<'a> Actor<'a> {
             sprite: sprite,
             inside_wagon: true,
             move_seq: VecDeque::new(),
+            rotation: 0.,
         }
     }
 }

@@ -13,6 +13,13 @@ use std::vec::IntoIter;
 use std::collections::VecDeque;
 use pathfinding::{PathfindingGrid, PathfindingTile};
 
+pub fn formula_rot(point: &Vector2f, angle_rad: f32) -> Vector2f {
+    let mut new = Vector2f::new(0., 0.);
+    new.x = point.x * angle_rad.cos() - point.y * angle_rad.sin();
+    new.y = point.x * angle_rad.sin() + point.y * angle_rad.cos();
+    new
+}
+
 #[derive(Clone, PartialEq, Eq, Hash)]
 pub enum Direction {
     North,
@@ -166,20 +173,13 @@ impl<'a> Wagon<'a> {
         let angle_rad = angle * ::std::f64::consts::PI as f32 / 180.;
         let orig = self.get_origin();
 
-        let formula_rot = |pos: Vector2f| {
-            let mut point = Vector2f::new(0., 0.);
-            point.x = pos.x * angle_rad.cos() - pos.y * angle_rad.sin();
-            point.y = pos.x * angle_rad.sin() + pos.y * angle_rad.cos();
-            point
-        };
-
         // rotate origin
         self.center.x -= orig.x;
         self.center.y -= orig.y;
 
         let pos = self.center;
 
-        let new = formula_rot(pos);
+        let new = formula_rot(&pos, angle_rad);
 
         self.center = orig + new;
 
@@ -191,7 +191,7 @@ impl<'a> Wagon<'a> {
 
                 let pos = t.sprite.get_position();
 
-                let new = formula_rot(pos);
+                let new = formula_rot(&pos, angle_rad);
 
                 t.sprite.set_position(&(orig + new));
 
@@ -204,8 +204,7 @@ impl<'a> Wagon<'a> {
 
     pub fn set_rotation(&mut self, angle: f32) {
         let current_rot = self.rotation;
-        self.rotate(360. - current_rot);
-        self.rotate(angle);
+        self.rotate(angle - current_rot);
         self.rotation = angle;
     }
 

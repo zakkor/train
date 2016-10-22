@@ -44,18 +44,18 @@ impl<'a> World<'a> {
     pub fn init(&mut self, tm: &'a TextureManager) {
         self.curves.push(
             (new_curve(Vec2::new(0., 300.),
-                       Vec2::new(800., 600.),
+                       Vec2::new(800., 900.),
                        Vec2::new(1600., 300.)),
              new_curve(Vec2::new(0., 500.),
-                       Vec2::new(800., 800.),
+                       Vec2::new(800., 1100.),
                        Vec2::new(1600., 500.))));
 
         self.curves.push(
             (new_curve(Vec2::new(1600., 300.),
-                       Vec2::new(2400., 0.),
+                       Vec2::new(2400., -300.),
                        Vec2::new(3200., 300.)),
              new_curve(Vec2::new(1600., 500.),
-                       Vec2::new(2400., 200.),
+                       Vec2::new(2400., -100.),
                        Vec2::new(3200., 500.))));
 
 

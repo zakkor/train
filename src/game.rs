@@ -498,6 +498,9 @@ impl<'a> Game<'a> {
 
                     self.train.update();
 
+                    // save wagon's origin location before we rotate and move it
+                    // because we need to use it as the actor's relative position to move and rotate them correctly
+                    let first_orig = self.train.wagons[1].get_origin();
                     for wagon in self.train.wagons.iter_mut() {
                         let origin = wagon.get_origin();
 
@@ -509,6 +512,30 @@ impl<'a> Game<'a> {
                                     break;
                                 }
                         }
+                    }
+                    self.tile_selection.set_rotation(self.train.wagons[1].rotation);
+
+                    let dest = self.train.wagons[1].get_origin();
+                    for a in self.am.actors.iter_mut() {
+                        // move actors relative to wagon position
+                        let current_pos =  a.sprite.get_position();
+                        a.sprite.set_position2f(current_pos.x + dest.x - first_orig.x,
+                                                current_pos.y + dest.y - first_orig.y);
+
+                        // rotate around wagon origin (center) TODO: make this into a function
+                        let angle =  self.train.wagons[1].rotation - a.rotation;
+                        let angle_rad = angle * ::std::f64::consts::PI as f32 / 180.;
+
+                        a.sprite.move2f(-first_orig.x, -first_orig.y);
+
+                        let pos = a.sprite.get_position();
+
+                        let new = formula_rot(&pos, angle_rad);
+
+                        a.sprite.set_position(&(first_orig + new));
+
+                        a.sprite.rotate(angle);
+                        a.rotation += angle;
                     }
 
                     // sounds
@@ -531,16 +558,6 @@ impl<'a> Game<'a> {
                         self.music_manager.get_mut(MusicId::Screech).stop();
                     }
 
-                    for a in self.am.actors.iter_mut() {
-                        if !a.inside_wagon {
-                            //TODO: add collision checking to this (refactor what is above into a checking function)
-                            a.sprite.move2f(dt * -self.train.current_speed, 0.);
-                        }
-                        a.sprite.set_rotation(self.train.wagons[1].rotation);
-                        let xpos =  a.sprite.get_position().x;
-                        a.sprite.set_position2f(xpos, self.train.wagons[1].get_origin().y); // TODO: rotate around point
-                    }
-
                     for e in self.enemies.iter_mut() {
                         if !e.inside_wagon {
                             //TODO add collision checking to this (refactor what is above into a checking function)
@@ -549,8 +566,8 @@ impl<'a> Game<'a> {
                     }
 
                     // TODO: VIEW RELATED TO WAGON ROTATION & MOVEMENT
-                    //self.camera.game.set_rotation(self.train.wagons[1].rotation);
-                    //self.camera.game.set_center(&self.train.wagons[1].get_origin());
+                    self.camera.game.set_rotation(self.train.wagons[1].rotation);
+                    self.camera.game.set_center(&self.train.wagons[1].get_origin());
 
                 }
             }
