@@ -1,6 +1,7 @@
 extern crate sfml;
 use sfml::graphics::*;
 use sfml::system::Vector2f;
+use resource_manager::{FontManager, FontId};
 
 pub enum ButtonType {
     Quit,
@@ -41,4 +42,15 @@ impl<'a> Button<'a> {
 
 pub struct Menu<'a> {
     pub buttons: Vec<Button<'a>>,
+}
+
+impl<'a> Menu<'a> {
+    pub fn init(&mut self, fm: &'a FontManager) {
+        self.buttons.push(Button::new(fm.get(FontId::Arial),
+                                           ButtonType::Resume,
+                                           &Vector2f::new(150., 180.)));
+        self.buttons.push(Button::new(fm.get(FontId::Arial),
+                                           ButtonType::Quit,
+                                           &Vector2f::new(150., 180. + 80.)));
+    }
 }

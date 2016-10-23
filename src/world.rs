@@ -44,19 +44,19 @@ impl<'a> World<'a> {
     pub fn init(&mut self, tm: &'a TextureManager) {
         self.curves.push(
             (new_curve(Vec2::new(0., 300.),
-                       Vec2::new(800., 900.),
-                       Vec2::new(1600., 300.)),
+                       Vec2::new(3500., 1600.),
+                       Vec2::new(7000., 2300.)),
              new_curve(Vec2::new(0., 500.),
-                       Vec2::new(800., 1100.),
-                       Vec2::new(1600., 500.))));
+                       Vec2::new(3500., 1800.),
+                       Vec2::new(7000., 2500.))));
 
-        self.curves.push(
-            (new_curve(Vec2::new(1600., 300.),
-                       Vec2::new(2400., -300.),
-                       Vec2::new(3200., 300.)),
-             new_curve(Vec2::new(1600., 500.),
-                       Vec2::new(2400., -100.),
-                       Vec2::new(3200., 500.))));
+        // self.curves.push(
+        //     (new_curve(Vec2::new(1600., 300.),
+        //                Vec2::new(2400., -1700.),
+        //                Vec2::new(3200., 300.)),
+        //      new_curve(Vec2::new(1600., 500.),
+        //                Vec2::new(2400., -1500.),
+        //                Vec2::new(3200., 500.))));
 
 
 
@@ -110,8 +110,8 @@ impl<'a> World<'a> {
         }
 
         for rail in self.rails.iter_mut() {
-            if rail.get_position().x <= -(WINDOW_SIZE_X as f32) {
-                rail.move2f((WINDOW_SIZE_X * 2) as f32, 0.);
+            if rail.get_position().x <= 0. {
+                rail.move2f(self.curves[0].0.to.x, 0.);
             }
             rail.move2f(speed, 0.);
         }

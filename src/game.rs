@@ -123,22 +123,17 @@ impl<'a> Game<'a> {
 
         self.world.init(&self.resources.tm);
 
-        self.menu.buttons.push(Button::new(self.resources.fm.get(FontId::Arial),
-                                           ButtonType::Resume,
-                                           &Vector2f::new(150., 180.)));
-        self.menu.buttons.push(Button::new(self.resources.fm.get(FontId::Arial),
-                                           ButtonType::Quit,
-                                           &Vector2f::new(150., 180. + 80.)));
+        self.menu.init(&self.resources.fm);
 
 
         //--------
 
-        self.train.init(700., 0.8); // top speed, accel
-        self.train.wagons.push(Wagon::new(&self.resources.tm, 8, 3));
+        self.train.init(1000., 30.); // top speed, accel
+        self.train.wagons.push(Wagon::new(&self.resources.tm, 2, 9));
 
         let mut y_size: i32 = 5;
         for x in 0..2 {
-            let mut new_wag = Wagon::new(&self.resources.tm, 8, 3);
+            let mut new_wag = Wagon::new(&self.resources.tm, 9, 3);
             y_size += if x % 2 == 0 { 2 } else { -2 };
 
             self.train.wagons.last_mut().unwrap().connect(&mut new_wag, &self.resources.tm);
@@ -339,6 +334,7 @@ impl<'a> Game<'a> {
                                     if !self.train.moving {
                                         let mut screech_sound = self.music_manager.get_mut(MusicId::Screech);
                                         screech_sound.set_loop(true);
+                                        screech_sound.set_volume(100.);
                                         screech_sound.play();
                                     }
                                 }
@@ -566,8 +562,8 @@ impl<'a> Game<'a> {
                     }
 
                     // TODO: VIEW RELATED TO WAGON ROTATION & MOVEMENT
-                    self.camera.game.set_rotation(self.train.wagons[1].rotation);
-                    self.camera.game.set_center(&self.train.wagons[1].get_origin());
+//                    self.camera.game.set_rotation(self.train.wagons[1].rotation);
+//                    self.camera.game.set_center(&self.train.wagons[1].get_origin());
 
                 }
             }
